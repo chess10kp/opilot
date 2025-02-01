@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "sam",
+  "productName": "opilot",
   "version": "0.1.0",
   "identifier": "com.tauri.dev",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "decorations": false,
-        "title": "sam",
+        "title": "opilot",
         "width": 1080,
         "height": 30,
         "resizable": true,
