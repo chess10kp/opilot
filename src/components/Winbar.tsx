@@ -51,13 +51,14 @@ export default function StatusBar() {
   }, []);
 
   return (
-    <div className="flex">
+    <div className="flex gap-x-2">
       {favoriteIcons &&
         favoriteIcons.map(([name, image]) => (
-          <div key={name} className="flex items-center gap-2">
+          <div key={name} className="gap-x-4">
             <Image
-              width={30}
-              height={30}
+              className=""
+              width={45}
+              height={45}
               src={image || ""}
               alt={image[0]}
               unoptimized
@@ -69,9 +70,5 @@ export default function StatusBar() {
 }
 
 export const Winbar = () => {
-  return (
-    <div className="flex items-center justify-between bg-[#E1E6F2] h-10">
-      <StatusBar />
-    </div>
-  );
+  return <StatusBar />;
 };
