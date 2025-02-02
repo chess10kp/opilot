@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Input } from "./ui/input";
 import { Menubar } from "./ui/menubar";
 import { Win11 } from "./Win11";
@@ -8,40 +9,61 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 
 export default function StatusBar() {
-  const [icons, setIcons] = useState<string[]>([]);
+  // TODO: expose this as a hook or config option
+  const favorites = ["firefox", "vscode", "emacs", "foot", "obs"];
+
+  const [icons, setIcons] = useState();
+  const [favoriteIcons, setFavoriteIcons] = useState<[string, string][]>();
   const [imagesLoading, setImagesLoading] = useState(false);
 
   useEffect(() => {
-    invoke("get_desktop_icons")
-      .then((result: string[]) => {
-        Promise.all(
-          result.map((iconPath) =>
-            invoke<string>("get_image_data", { imagePath: iconPath }),
-          ),
-        )
-          .then((images: any) => {
-            images = images.filter(
-              (image: any) => image !== null || image === undefined,
-            );
-            setIcons(images);
-            setImagesLoading(true);
-          })
-          .catch((error) => window.console.error("Error fetching image data:", error));
+    const ic = invoke("get_desktop_icons")
+      // @ts-ignore
+      .then((result: Record<string, string>) => {
+        return Promise.all(
+          Object.entries(result).map(async ([k, v]) => {
+            try {
+              const image = await invoke<string>("get_image_data", {
+                imagePath: v,
+              });
+              return [k, image];
+            } catch (e) {
+              console.log("Error fetching image: ", e);
+              return [k, null];
+            }
+          }),
+        );
       })
-      .catch((error) => window.console.error("Error fetching icon paths:", error));
-      window.console.log("Icons fetched : " + icons )
+      .then((ic: any) => {
+        const newMap = new Map(ic);
+        setIcons(newMap);
+
+        const filtered = ic.filter(([name, _]) =>
+          favorites.some((fav) => name.toLowerCase().includes(fav)),
+        );
+        setFavoriteIcons(filtered);
+        console.log(filtered);
+        console.log(ic);
+      })
+      .catch((error) =>
+        window.console.error("Error fetching icon paths:", error),
+      );
   }, []);
 
   return (
-    <div className="status-bar">
-      {icons.map((icon, index) => (
-        <img
-          key={index}
-          src={icon}
-          alt="icon"
-          className="icon"
-        />
-      ))}
+    <div className="flex">
+      {favoriteIcons &&
+        favoriteIcons.map(([name, image]) => (
+          <div key={name} className="flex items-center gap-2">
+            <Image
+              width={30}
+              height={30}
+              src={image || ""}
+              alt={image[0]}
+              unoptimized
+            />
+          </div>
+        ))}
     </div>
   );
 }
@@ -49,11 +71,6 @@ export default function StatusBar() {
 export const Winbar = () => {
   return (
     <div className="flex items-center justify-between bg-[#E1E6F2] h-10">
-      <Input
-        placeholder="Search"
-        className="mx-1 rounded-lg px-3"
-        style={{ width: "calc(100% - 60px)" }}
-      />
       <StatusBar />
     </div>
   );

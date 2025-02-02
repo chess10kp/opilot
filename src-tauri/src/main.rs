@@ -2,16 +2,15 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use base64;
-use std::fs;
-use std::process::Command;
+use std::collections::HashMap;
+use std::{fs, process::Command, path::Path};
 use tauri::command;
+
 
 #[command]
 async fn get_image_data(image_path: String) -> Result<String, String> {
-
     let image_path = image_path.trim().trim_matches(&['\'', ' ', ','][..]);
     if !std::path::Path::new(&image_path).exists() {
-
         if !image_path.starts_with("/") {
             return Ok("".to_string());
         }
@@ -33,25 +32,28 @@ async fn get_image_data(image_path: String) -> Result<String, String> {
 }
 
 #[command]
-async fn get_desktop_icons() -> Result<Vec<String>, String> {
+fn get_desktop_icons() -> HashMap<String, String> {
     let output = Command::new("node")
         .arg("getIcons.js")
         .output()
-        .map_err(|e| format!("Failed to execute Node.js script: {}", e))?;
+        .expect("Failed to execute Node.js script");
 
     if !output.status.success() {
-        return Err(format!(
-            "Node.js script failed: {}",
+        eprintln!(
+            "Node.js script error: {}",
             String::from_utf8_lossy(&output.stderr)
-        ));
+        );
+        return HashMap::new();
     }
 
-    let icon_paths: Vec<String> = String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .map(|line| line.to_string())
-        .collect();
-
-    Ok(icon_paths)
+    let json_output = String::from_utf8_lossy(&output.stdout);
+    match serde_json::from_str::<HashMap<String, String>>(&json_output) {
+        Ok(icons) => icons,
+        Err(err) => {
+            println!("JSON parsing error: {}", err);
+            HashMap::new()
+        }
+    }
 }
 
 fn main() {
