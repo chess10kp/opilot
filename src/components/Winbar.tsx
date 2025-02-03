@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Input } from "./ui/input";
 import { Menubar } from "./ui/menubar";
 import { Win11 } from "./Win11";
+import { Copilot } from "./Copilot";
 import { invoke } from "@tauri-apps/api/core";
 
 import { useEffect, useState } from "react";
@@ -70,5 +71,10 @@ export default function StatusBar() {
 }
 
 export const Winbar = () => {
-  return <StatusBar />;
+  return (
+    <>
+      <Copilot />
+      <StatusBar />
+    </>
+  );
 };

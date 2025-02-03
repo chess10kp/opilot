@@ -11,13 +11,11 @@ import "./globals.css";
 import { Clock } from "@/components/Clock";
 
 export default function Home() {
-  // <div className="flex bg-[#E1E6F2] h-screen justify-center items-center font-[family-name:var(--font-geist-sans)]">
-  //   <div className="flex items-center justify-self-center">
-  //     <Win11 height={30} width={30} />
-  //   </div>
-  //   <Winbar />
-  // </div>
 
+  const onCopilotClick = () => {
+      // TODO: invoke tauri command to open copilot window
+  }
+ 
   return (
     <div className="bg-[#E1E6F2] ">
       <div className="px-4 flex justify-between">
