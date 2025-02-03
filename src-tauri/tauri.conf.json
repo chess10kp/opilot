@@ -13,7 +13,7 @@
     "windows": [
       {
         "decorations": false,
-        "title": "opilot",
+        "title": "opilot status",
         "width": 1920,
         "height": 30,
         "resizable": true,
