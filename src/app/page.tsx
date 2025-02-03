@@ -27,23 +27,26 @@ export default function Home() {
     setSidebarOpen(!sidebarOpen);
   };
 
+  // return (
+  //   <>
+  //     <div className="bg-background ">
+  //       <div className="px-4 flex justify-between">
+  //         <div className="flex py-1 gap-x-4 justify-self-center items-center">
+  //           <Win11 className="w-4 h-4" />
+  //           <Winbar toggleSidebar={handleToggleSidebar} />
+  //         </div>
+  //         <div className="flex items-center gap-4">
+  //           <ChevronUp className="text-black" />
+  //           <Wifi className="w-5 h-5 text-black" />
+  //           <Volume className="w-5 h-5 text-black" />
+  //           <Battery className="w-5 h-5 text-black" />
+  //           <Clock />
+  //         </div>
+  //       </div>
+  //     </div>
+  //   </>
+  // );
   return (
-    <>
-      <div className="bg-background ">
-        <div className="px-4 flex justify-between">
-          <div className="flex py-1 gap-x-4 justify-self-center items-center">
-            <Win11 className="w-4 h-4" />
-            <Winbar toggleSidebar={handleToggleSidebar} />
-          </div>
-          <div className="flex items-center gap-4">
-            <ChevronUp className="text-black" />
-            <Wifi className="w-5 h-5 text-black" />
-            <Volume className="w-5 h-5 text-black" />
-            <Battery className="w-5 h-5 text-black" />
-            <Clock />
-          </div>
-        </div>
-      </div>
-    </>
-  );
+    <CopilotWindow />
+  )
 }
