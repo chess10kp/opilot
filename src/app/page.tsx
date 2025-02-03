@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button"; // shadcn UI button (or you can
 import { Logo } from "@/components/Icons";
 import { Win11 } from "@/components/Win11";
 import { Winbar } from "@/components/Winbar";
-import { Wifi, Battery, Volume } from "@geist-ui/icons";
 import { ChevronUp } from "@geist-ui/icons";
 import "./globals.css";
 import { Clock } from "@/components/Clock";
@@ -19,11 +18,10 @@ export default function Home() {
   const handleToggleSidebar = () => {
     const webView = new WebviewWindow("opilot_sidebar", {
       url: "http://localhost:3000/opilot",
-      width: 400, 
+      width: 600, 
       height: 900,
       decorations: false,
     });
-    window.console.log("hi")
     setSidebarOpen(!sidebarOpen);
   };
 
