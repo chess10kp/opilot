@@ -3,9 +3,19 @@
 
 use base64;
 use std::collections::HashMap;
-use std::{fs, process::Command, path::Path};
+use std::{fs, process::Command};
 use tauri::command;
 
+#[command]
+fn open_opilot_window(app: tauri::AppHandle) -> bool {
+    let win_name = "opilot_sidebar";
+    let _ = tauri::webview::WebviewWindowBuilder::new(
+        &app,
+        win_name,
+        tauri::WebviewUrl::App("opilot".into()),
+    );
+    true
+}
 
 #[command]
 async fn get_image_data(image_path: String) -> Result<String, String> {
@@ -29,6 +39,25 @@ async fn get_image_data(image_path: String) -> Result<String, String> {
         }
         Err(e) => Err(format!("Failed to read image: {}", e)),
     }
+}
+
+#[command]
+fn query_gemini(prompt: String) -> String {
+    let output = Command::new("node")
+        .arg("gemini.js")
+        .arg("prompt")
+        .arg(prompt)
+        .output()
+        .expect("Failed to execute Node.js script");
+    if !output.status.success() {
+        eprintln!(
+            "Node.js script error: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return "".to_string();
+    }
+    let json_output = String::from_utf8_lossy(&output.stdout);
+    json_output.to_string()
 }
 
 #[command]
@@ -58,7 +87,12 @@ fn get_desktop_icons() -> HashMap<String, String> {
 
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![get_desktop_icons, get_image_data])
+        .invoke_handler(tauri::generate_handler![
+            get_desktop_icons,
+            get_image_data,
+            query_gemini,
+            open_opilot_window
+        ])
         .run(tauri::generate_context!())
         .expect("failed to run app");
     app_lib::run();

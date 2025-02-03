@@ -70,10 +70,10 @@ export default function StatusBar() {
   );
 }
 
-export const Winbar = () => {
+export const Winbar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
   return (
     <>
-      <Copilot />
+      <Copilot onClick={toggleSidebar} />
       <StatusBar />
     </>
   );
