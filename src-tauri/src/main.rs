@@ -3,7 +3,7 @@
 
 use base64;
 use std::collections::HashMap;
-use std::{fs, process::Command};
+use std::{fs, process::Command, process::Stdio};
 use tauri::command;
 
 #[command]
@@ -39,6 +39,24 @@ async fn get_image_data(image_path: String) -> Result<String, String> {
         }
         Err(e) => Err(format!("Failed to read image: {}", e)),
     }
+}
+
+#[command]
+fn capture_screen() -> String {
+    // TODO: remove hardcoded screenshot path
+
+    let region = Command::new("slurp")
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("failed slurp");
+
+    let reverse = Command::new("grim")
+        .arg("-g")
+        .arg("screenshot.png")
+        .stdin(region.stdout.unwrap())  
+        .output()
+        .expect("failed grim");
+    "".to_string()
 }
 
 #[command]
@@ -91,7 +109,8 @@ fn main() {
             get_desktop_icons,
             get_image_data,
             query_gemini,
-            open_opilot_window
+            open_opilot_window,
+            capture_screen
         ])
         .run(tauri::generate_context!())
         .expect("failed to run app");

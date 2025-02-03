@@ -2,10 +2,28 @@
 
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { Button } from "@/components/ui/button";
 
 export default function Copilot() {
   const [query, setQuery] = useState("");
   const [response, setResponse] = useState("");
+
+  const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_GEMINI || "");
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+  // TODO: figure out streaming responses
+  // const sendPrompt = async () => {
+  //   if (!query) return;
+  //   setResponse("");
+  //   window.console.log("query", query);
+  //
+  //   const result = await model.generateContentStream(query);
+  //
+  //   for await (const chunk of result.stream) {
+  //     setResponse((prev) => prev + chunk.text);
+  //   }
+  // };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,12 +49,12 @@ export default function Copilot() {
           placeholder="Type your query..."
           className="border border-gray-300 rounded px-3 py-2 w-full"
         />
-        <button
-          type="submit"
+        <Button
           className="mt-2 bg-blue-500 text-white px-4 py-2 rounded"
+          onClick={sendPrompt}
         >
           Ask
-        </button>
+        </Button>
       </form>
       <div className="p-4 border border-gray-200 rounded">
         <h2 className="font-semibold">Response:</h2>
