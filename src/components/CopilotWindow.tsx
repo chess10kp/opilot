@@ -12,6 +12,163 @@ import { Textarea } from "@/components/ui/textarea";
 import { CopilotWindowToggleBar } from "./CopilotWindowToggleBar";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import { SidebarProvider } from "./ui/sidebar";
+import ChatMessage from "@/components/chat-message";
+
+const QueryOutput = ({ response }: { response: string }) => {
+  return (
+    <div className="flex-1 border-0 h-full">
+      {response ? (
+        <ScrollArea className="w-full h-[70%] border-0">
+          <Markdown>{response}</Markdown>
+        </ScrollArea>
+      ) : (
+        <div className="flex border-0 items-center h-full justify-center">
+          <h1 className="text-lg font-bold mb-4">
+            <div className="flex items-center gap-2">
+              Opilot, powered by
+              <GeminiIcon />
+            </div>
+          </h1>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ChatOutput = ({ chatHistory }: { chatHistory: string[] }) => {
+  return (
+    <div className="flex-1 border-0  h-full w-full">
+      {chatHistory.length > 0 ? (
+        <ScrollArea className="w-full h-[70%] border-0">
+          {chatHistory.map((message, index) => (
+            <ChatMessage key={index} isBot={false} message={message} />
+          ))}
+        </ScrollArea>
+      ) : (
+        <div className="flex border-0 items-center h-full justify-center">
+          <h1 className="text-lg font-bold mb-4">
+            <div className="flex items-center gap-2">
+              Opilot, powered by
+              <GeminiIcon />
+            </div>
+          </h1>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ChatInput = ({
+  query,
+  handleSubmit,
+  setQuery,
+}: {
+  query: string;
+  handleSubmit: any;
+  setQuery: any;
+}) => {
+  return (
+    <form onSubmit={handleSubmit} className="m-0 p-0 gap-2 flex items-center">
+      <Button className="" onClick={handleSubmit}>
+        <Search className="w-4 h-4" />
+      </Button>
+      <Textarea
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Ask me anything!"
+        className="px-1 text-xs  my-4 shadow-none focus-visible:ring-0 border-b-black border-2 focus-visible:border-b-black focus-visible:border-2 rounded-none w-full focus:ring-0 focus:border-0"
+      />
+    </form>
+  );
+};
+
+const ChatWindow = ({ model }: { model: any }) => {
+  const [chatPrompt, setChatPrompt] = useState<string>("");
+  const [chatHistory, setChatHistory] = useState<string[]>([]);
+  const [chatStarted, setChatStarted] = useState(false);
+
+  const handleSubmitChat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const chat = model.startChat({
+      history: [
+        {
+          role: "user",
+          parts: [{ text: "Hello" }],
+        },
+        {
+          role: "model",
+          parts: [{ text: "Great to meet you. What would you like to do?" }],
+        },
+      ],
+    });
+
+    // TODO: make this async
+    let result = await chat.sendMessageStream("I have 2 dogs in my house.");
+    for await (const chunk of result.stream) {
+      const chunkText = chunk.text();
+      process.stdout.write(chunkText);
+    }
+    let result2 = await chat.sendMessageStream(
+      "How many paws are in my house?",
+    );
+    for await (const chunk of result2.stream) {
+      const chunkText = chunk.text();
+      process.stdout.write(chunkText);
+    }
+  };
+
+  return (
+    <div className="flex-1 border-0  h-full w-full">
+      {chatStarted ? (
+        <ScrollArea className="w-full h-[70%] border-0">
+          {chatHistory.map((message: string, index: number) => (
+            <ChatMessage key={index} isBot={false} message={message} />
+          ))}
+        </ScrollArea>
+      ) : (
+        <div className="flex border-0 items-center h-full justify-center">
+          <h1 className="text-lg font-bold mb-4">
+            <div className="flex items-center gap-2">
+              Opilot, powered by
+              <GeminiIcon />
+            </div>
+          </h1>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const StartChat = async ({ model }) => {
+  const startChat = async () => {
+    const chat = model.startChat({
+      history: [
+        {
+          role: "user",
+          parts: [{ text: "Hello" }],
+        },
+        {
+          role: "model",
+          parts: [{ text: "Great to meet you. What would you like to do?" }],
+        },
+      ],
+    });
+
+    // TODO: make this async
+    let result = await chat.sendMessageStream("I have 2 dogs in my house.");
+    for await (const chunk of result.stream) {
+      const chunkText = chunk.text();
+      process.stdout.write(chunkText);
+    }
+    let result2 = await chat.sendMessageStream(
+      "How many paws are in my house?",
+    );
+    for await (const chunk of result2.stream) {
+      const chunkText = chunk.text();
+      process.stdout.write(chunkText);
+    }
+  };
+};
 
 export default function CopilotWindow() {
   const [query, setQuery] = useState("");
@@ -24,7 +181,7 @@ export default function CopilotWindow() {
     model: "gemini-1.5-flash",
     systemInstruction:
       'You are an assistant on a sidebar of a Wayland Linux desktop.\
-    Please always use a casual tone when answering your questions, unless requested otherwise or making writing suggestions.\
+    Please always use a casual tone when answering your questions, unlees requested otherwise or making writing suggestions.\
     When making a suggestion, please use the following format: {message: "<your response>", type: <number that I tell you to include>}\n\
     These are the steps you should take to respond to the user\'s queries:\n\
     1. If it\'s a writing- or grammar-related question or a sentence in quotation marks, Please point out errors and correct when necessary using underlines, and make the writing more natural where appropriate without making too major changes.\
@@ -55,6 +212,10 @@ export default function CopilotWindow() {
   //   }
   // };
 
+  const handleSubmitChat = async (e: React.FormEvent) => {
+    e.preventDefault();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -76,47 +237,32 @@ export default function CopilotWindow() {
 
   return (
     <div
-      className={`fixed top-0 left-0 h-full w-64 flex text-xs items-stretch flex-col bg-background text-foreground p-4 transition-transform duration-300 -translate-x-0`}
+      className={`fixed top-0 left-0 h-full w-64 flex text-xs items-center flex-col bg-background text-foreground p-4 transition-transform duration-300 -translate-x-0`}
     >
-      <Tabs defaultValue="query" className="h-full rounded-none p-0">
+      <Tabs
+        defaultValue="chat"
+        className="h-[100%] bg-background flex flex-col rounded-none p-0"
+      >
         <CopilotWindowToggleBar />
 
         <TabsContent
-          className={`h-full flex border-0 data-[state=active]:outline-none text-xs items-stretch flex-col bg-background text-foreground p-4 transition-transform duration-300 -translate-x-0`}
+          className={`flex flex-col bg-background text-foreground border-0 data-[state=active]:outline-none text-xs`}
           value="query"
         >
-          <div className="flex-1 border-0  h-full w-full">
-            {response ? (
-              <ScrollArea className="w-full h-[70%] border-0">
-                <Markdown>{response}</Markdown>
-              </ScrollArea>
-            ) : (
-              <div className="flex border-0 items-center h-full justify-center">
-                <h1 className="text-lg font-bold mb-4">
-                  <div className="flex items-center gap-2">
-                    Opilot, powered by
-                    <GeminiIcon />
-                  </div>
-                </h1>
-              </div>
-            )}
-          </div>
-          <form
-            onSubmit={handleSubmit}
-            className="m-0 p-0 gap-2 flex items-center"
-          >
-            <Button className="" onClick={handleSubmit}>
-              <Search className="w-4 h-4" />
-            </Button>
-            <Textarea
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ask me anything!"
-              className="px-1 text-xs  my-4 shadow-none focus-visible:ring-0 border-b-black border-2 focus-visible:border-b-black focus-visible:border-2 rounded-none w-full focus:ring-0 focus:border-0"
-            />
-          </form>
+          <QueryOutput response={response} />
+          <ChatInput
+            query={query}
+            handleSubmit={handleSubmit}
+            setQuery={setQuery}
+          />
         </TabsContent>
-        <TabsContent value="chat"></TabsContent>
+
+        <TabsContent
+          className={`flex border-0 data-[state=active]:outline-none text-xs items-stretch flex-col bg-background text-foreground p-4 transition-transform duration-300 -translate-x-0`}
+          value="chat"
+        >
+          <ChatWindow model={model} />
+        </TabsContent>
       </Tabs>
     </div>
   );

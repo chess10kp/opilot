@@ -8,7 +8,7 @@ interface ChatMessageProps extends React.HTMLAttributes<HTMLDivElement> {
   message: string
 }
 
-export function ChatMessage({ isBot, message, className, ...props }: ChatMessageProps) {
+export default function ChatMessage({ isBot, message, className, ...props }: ChatMessageProps) {
   return (
     <div className={cn("flex gap-3 text-sm leading-relaxed", isBot && "bg-accent/50 px-4 py-6", className)} {...props}>
       <div className="relative flex size-6 shrink-0 items-center justify-center rounded-lg border bg-background shadow">
