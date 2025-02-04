@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { MessageSquare, Calendar, Search } from "@geist-ui/icons";
+import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface MenuBarProps {
   className?: string;
@@ -13,17 +14,18 @@ const menuItems = [
     icon: (props: React.SVGProps<SVGSVGElement>) => (
       <MessageSquare {...props} />
     ),
-    label: "Chat",
-    callback: () => {}
+    value: "query",
+    callback: () => {},
   },
   {
     icon: (props: React.SVGProps<SVGElement>) => <Calendar {...props} />,
-    label: "Agenda",
-    callback: () => {}
+    value: "agenda",
+    callback: () => {},
   },
   {
     icon: (props: React.SVGProps<SVGSVGElement>) => <Search {...props} />,
-    callback: () => {}
+    value: "chat",
+    callback: () => {},
   },
 ];
 
@@ -31,32 +33,26 @@ export function CopilotWindowToggleBar({ className }: MenuBarProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   return (
-    <div className="relative">
-      {activeIndex !== null && (
-        <p className="text-white/80 text-[13px] font-medium font-['Geist'] leading-tight whitespace-nowrap">
-          {menuItems[activeIndex].label}
-        </p>
-      )}
-
-      <div className="bg-black justify-center items-center inline-flex ">
-        {menuItems.map((item, index) => (
+    <TabsList className="bg-black px-0 rounded-none justify-center items-center inline-flex ">
+      {menuItems.map((item, index) => (
+        <TabsTrigger key={index} className="rounded-none w-fit h-fit data-[state=active]:bg-background data-[state=active]:text-background shadow-none" value={item.value || ""}>
           <button
             key={index}
-            className="w-8 h-8 px-3 py-1 rounded-[99px] justify-center items-center gap-2 flex hover:bg-[hsla(0,0%,100%,0.08)] transition-colors"
+            className="w-8 h-8 px-3 py-1 rounded-none justify-center items-center gap-2 flex  transition-colors"
             onClick={item.callback}
           >
             <div className="justify-center items-center flex">
               <div className="w-[18px] h-[18px] flex justify-center items-center overflow-hidden">
                 <item.icon
-                  color="bg-background"
-                  className="w-full h-full text-[#fafafb]"
+                  color="bg-background data-[state=active]:text-background"
+                  className="w-full h-full "
                 />
               </div>
             </div>
-            <span className="sr-only">{item.label}</span>
+            <span className="sr-only">{item.value}</span>
           </button>
-        ))}
-      </div>
-    </div>
+        </TabsTrigger>
+      ))}
+    </TabsList>
   );
 }
