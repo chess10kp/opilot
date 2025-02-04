@@ -18,6 +18,24 @@ fn open_opilot_window(app: tauri::AppHandle) -> bool {
 }
 
 #[command]
+async fn parse_agenda(text: String) -> String {
+    let agenda = Command::new("node")
+        .arg("scheduler.js")
+        .arg("agenda")
+        .output()
+        .expect("Failed to execute Node.js script");
+    if !agenda.status.success() {
+        eprintln!(
+            "Node.js script error: {}",
+            String::from_utf8_lossy(&agenda.stderr)
+        );
+        return "".to_string();
+    }
+    let json_output = String::from_utf8_lossy(&agenda.stdout);
+    json_output.to_string()
+}
+
+#[command]
 async fn get_image_data(image_path: String) -> Result<String, String> {
     let image_path = image_path.trim().trim_matches(&['\'', ' ', ','][..]);
     if !std::path::Path::new(&image_path).exists() {
@@ -53,7 +71,7 @@ fn capture_screen() -> String {
     let reverse = Command::new("grim")
         .arg("-g")
         .arg("screenshot.png")
-        .stdin(region.stdout.unwrap())  
+        .stdin(region.stdout.unwrap())
         .output()
         .expect("failed grim");
     "".to_string()

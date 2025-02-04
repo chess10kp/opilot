@@ -5,7 +5,7 @@ async function parseOrgFile(text) {
   return orgFile;
 }
 
-async function getScheduledEvents(text) {
+async function parseScheduledEvents(text) {
   const orgFile = baseParse(text);
   return orgFile.children
     .filter((node) =>
@@ -29,8 +29,49 @@ ACTION: name_of_action
 :END:
 `;
 
-console.dir(getScheduledEvents(orgText), { depth: null });
-// console.dir(parseOrgFile(orgText), { depth: null });
+async function getScheduledEvents() {
+  const text = await ReadFile("test.org");
+  const parsed = parseScheduledEvents(text);
+  // check if the date of the task is in next 10 minutes
+  // if yes, add "now: true" to the task, otherwise false
+
+  if (parsed.length == 0) {
+    return [];
+  }
+
+  const now = new Date();
+  const nextTenMinutes = new Date(now.getTime() + 10 * 60 * 1000);
+
+  for (const task of parsed) {
+    const date = new Date(task.date);
+    if (date > nextTenMinutes) {
+      task.now = true;
+    } else {
+      task.now = false;
+    }
+  }
+  return parsed;
+}
+
+async function ReadFile(filePath) {
+  return new Promise((resolve, reject) => {
+    fs.readFile(filePath, "utf8", (err, data) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(data);
+      }
+    });
+  });
+}
+
+async function main() {
+  if (process.argv[2] === "agenda") {
+    console.dir(getScheduledEvents(orgText), { depth: null });
+  }
+}
+
+main();
 
 // {
 //   type: 0,
