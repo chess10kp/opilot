@@ -12,7 +12,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { CopilotWindowToggleBar } from "./CopilotWindowToggleBar";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import { SidebarProvider } from "./ui/sidebar";
-import ChatMessage from "@/components/chat-message";
+import ChatMessageType from "@/components/chat-message";
+
+// TODO: move this to node.js backend while also figuring out streaming
+const dotenv = require("dotenv");
 
 const QueryOutput = ({ response }: { response: string }) => {
   return (
@@ -41,14 +44,14 @@ const ChatOutput = ({ chatHistory }: { chatHistory: string[] }) => {
       {chatHistory.length > 0 ? (
         <ScrollArea className="w-full h-[70%] border-0">
           {chatHistory.map((message, index) => (
-            <ChatMessage key={index} isBot={false} message={message} />
+            <ChatMessageType key={index} isBot={false} message={message} />
           ))}
         </ScrollArea>
       ) : (
         <div className="flex border-0 items-center h-full justify-center">
           <h1 className="text-lg font-bold mb-4">
             <div className="flex items-center gap-2">
-              Opilot, powered by
+              Opilot Chat
               <GeminiIcon />
             </div>
           </h1>
@@ -82,38 +85,83 @@ const ChatInput = ({
   );
 };
 
+type ChatMessageType = {
+  role: "user" | "model";
+  text: string;
+};
+
 const ChatWindow = ({ model }: { model: any }) => {
   const [chatPrompt, setChatPrompt] = useState<string>("");
-  const [chatHistory, setChatHistory] = useState<string[]>([]);
+  const [chatHistory, setChatHistory] = useState<ChatMessageType[]>([]);
   const [chatStarted, setChatStarted] = useState(false);
+  const [chatSession, setChatSession] = useState<any>(null);
+  const [isSending, setIsSending] = useState<boolean>(false);
+
+  const addMessage = (message: ChatMessageType) => {
+    setChatHistory((prev) => [...prev, message]);
+  };
 
   const handleSubmitChat = async (e: React.FormEvent) => {
+    window.console.log("handleSubmitChat");
+    window.console.log(chatPrompt);
+    window.console.dir(chatHistory, { depth: null });
+    window.console.log(chatSession);
+    window.console.log(chatStarted);
     e.preventDefault();
-    const chat = model.startChat({
-      history: [
-        {
-          role: "user",
-          parts: [{ text: "Hello" }],
-        },
-        {
-          role: "model",
-          parts: [{ text: "Great to meet you. What would you like to do?" }],
-        },
-      ],
-    });
+    if (!chatPrompt.trim()) return;
 
-    // TODO: make this async
-    let result = await chat.sendMessageStream("I have 2 dogs in my house.");
-    for await (const chunk of result.stream) {
-      const chunkText = chunk.text();
-      process.stdout.write(chunkText);
+    let session = chatSession;
+    if (!chatStarted || !session) {
+      const chat = model.startChat({
+        history: [
+          {
+            role: "user",
+            parts: [{ text: "Hello" }],
+          },
+          {
+            role: "model",
+            parts: [{ text: "Great to meet you. What would you like to do?" }],
+          },
+        ],
+      });
+      setChatSession(chat);
+      setChatStarted(true);
+
+      addMessage({ role: "user", text: "Hello" });
+      addMessage({
+        role: "model",
+        text: "Great to meet you. What would you like to do?",
+      });
+      setChatSession(chat);
+      setChatStarted(true);
     }
-    let result2 = await chat.sendMessageStream(
-      "How many paws are in my house?",
-    );
-    for await (const chunk of result2.stream) {
-      const chunkText = chunk.text();
-      process.stdout.write(chunkText);
+
+    addMessage({ role: "user", text: chatPrompt });
+
+    const currentPrompt = chatPrompt;
+    setChatPrompt("");
+
+    try {
+      setIsSending(true);
+
+      let result = await session.sendMessageStream(currentPrompt);
+      let res = "";
+
+      for await (const chunk of result.stream) {
+        const chunkText = chunk.text();
+        res += chunkText;
+        setChatHistory((prev) => {
+          if (prev[prev.length - 1].role == "model") {
+            return [...prev.slice(0, -1), { role: "model", text: res }];
+          } else {
+            return [...prev, { role: "model", text: res }];
+          }
+        });
+      }
+    } catch (e) {
+      window.console.log(e);
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -121,8 +169,8 @@ const ChatWindow = ({ model }: { model: any }) => {
     <div className="flex-1 border-0  h-full w-full">
       {chatStarted ? (
         <ScrollArea className="w-full h-[70%] border-0">
-          {chatHistory.map((message: string, index: number) => (
-            <ChatMessage key={index} isBot={false} message={message} />
+          {chatHistory.map((message: ChatMessageType, index: number) => (
+            <ChatMessageType key={index} isBot={false} message={message.text} />
           ))}
         </ScrollArea>
       ) : (
@@ -135,39 +183,13 @@ const ChatWindow = ({ model }: { model: any }) => {
           </h1>
         </div>
       )}
+      <ChatInput
+        query={chatPrompt}
+        handleSubmit={handleSubmitChat}
+        setQuery={setChatPrompt}
+      />
     </div>
   );
-};
-
-const StartChat = async ({ model }) => {
-  const startChat = async () => {
-    const chat = model.startChat({
-      history: [
-        {
-          role: "user",
-          parts: [{ text: "Hello" }],
-        },
-        {
-          role: "model",
-          parts: [{ text: "Great to meet you. What would you like to do?" }],
-        },
-      ],
-    });
-
-    // TODO: make this async
-    let result = await chat.sendMessageStream("I have 2 dogs in my house.");
-    for await (const chunk of result.stream) {
-      const chunkText = chunk.text();
-      process.stdout.write(chunkText);
-    }
-    let result2 = await chat.sendMessageStream(
-      "How many paws are in my house?",
-    );
-    for await (const chunk of result2.stream) {
-      const chunkText = chunk.text();
-      process.stdout.write(chunkText);
-    }
-  };
 };
 
 export default function CopilotWindow() {
@@ -237,11 +259,11 @@ export default function CopilotWindow() {
 
   return (
     <div
-      className={`fixed top-0 left-0 h-full w-64 flex text-xs items-center flex-col bg-background text-foreground p-4 transition-transform duration-300 -translate-x-0`}
+      className={`fixed top-0 left-0 h-full w-64 flex text-xs flex-col bg-background text-foreground p-4 transition-transform duration-300 -translate-x-0`}
     >
       <Tabs
         defaultValue="chat"
-        className="h-[100%] bg-background flex flex-col rounded-none p-0"
+        className="h-[100%] bg-background rounded-none p-0"
       >
         <CopilotWindowToggleBar />
 

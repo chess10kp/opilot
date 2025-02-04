@@ -1,39 +1,44 @@
-import * as React from "react"
-import { SendHorizontal } from "lucide-react"
+import { useEffect, useState, useRef } from "react";
+import { SendHorizontal } from "lucide-react";
 
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 
 interface ChatInputProps extends React.HTMLAttributes<HTMLFormElement> {
-  onSubmit: (message: string) => void
-  isLoading?: boolean
+  onSubmit: (e: any) => void;
+  isLoading?: boolean;
 }
 
-export function ChatInput({ onSubmit, isLoading, className, ...props }: ChatInputProps) {
-  const [message, setMessage] = React.useState("")
-  const textareaRef = React.useRef<HTMLTextAreaElement>(null)
+export function ChatInput({
+  onSubmit,
+  isLoading,
+  className,
+  ...props
+}: ChatInputProps) {
+  const [message, setMessage] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (message.trim()) {
-      onSubmit(message)
-      setMessage("")
+      onSubmit(message);
+      setMessage("");
     }
-  }
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSubmit(e)
+      e.preventDefault();
+      handleSubmit(e);
     }
-  }
+  };
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = "inherit"
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+      textareaRef.current.style.height = "inherit";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
-  }, [textareaRef])
+  }, [textareaRef]);
 
   return (
     <form onSubmit={handleSubmit} {...props}>
@@ -47,12 +52,16 @@ export function ChatInput({ onSubmit, isLoading, className, ...props }: ChatInpu
           className="min-h-[56px] w-full resize-none bg-background px-4 py-4 focus-visible:ring-1"
           rows={1}
         />
-        <Button type="submit" size="icon" disabled={isLoading || !message.trim()} className="absolute bottom-3 right-3">
+        <Button
+          type="submit"
+          size="icon"
+          disabled={isLoading || !message.trim()}
+          className="absolute bottom-3 right-3"
+        >
           <SendHorizontal className="size-4" />
           <span className="sr-only">Send message</span>
         </Button>
       </div>
     </form>
-  )
+  );
 }
-
