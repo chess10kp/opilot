@@ -122,10 +122,8 @@ async fn get_image_data(image_path: String) -> Result<String, String> {
     }
 }
 
-#[command]
 fn capture_screen() -> String {
     // TODO: remove hardcoded screenshot path
-
     let region = Command::new("slurp")
         .stdout(Stdio::piped())
         .spawn()
@@ -138,6 +136,48 @@ fn capture_screen() -> String {
         .output()
         .expect("failed grim");
     "".to_string()
+}
+
+fn ocr() -> String {
+    capture_screen();
+    let output = Command::new("node")
+        .arg("scheduler.js")
+        .arg("ocr")
+        .arg("screenshot.png")
+        .output()
+        .expect("Failed to execute Node.js script");
+
+    if !output.status.success() {
+        eprintln!(
+            "Node.js script error: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return "".to_string();
+    }
+    String::from_utf8_lossy(&output.stdout).to_string()
+}
+
+fn add_event_to_schedule() -> String{
+    let output: String = ocr();
+    println!("{}", output);
+    let query = format!("An org mode entry looks like this:\n* TODO Schedule this \nSCHEDULED: <2025-02-07 Fri>\n:LOGBOOK:\nLINK: link to meeting?\nACTION: name_of_action\n:END:\n\
+        From this text:'{}', generate an org entry", output);
+    let output = Command::new("node")
+        .arg("gemini.js")
+        .arg("query")
+        .arg(query)
+        .output()
+        .expect("Failed to execute Node.js script");
+
+    if !output.status.success() {
+        eprintln!(
+            "Node.js script error: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return "".to_string();
+    }
+    let output = String::from_utf8_lossy(&output.stdout);
+    output.to_string()
 }
 
 #[command]
