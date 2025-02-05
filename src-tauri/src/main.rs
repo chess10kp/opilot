@@ -2,8 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use base64;
-use std::collections::HashMap;
-use std::{fs, process::Command, process::Stdio};
+use std::{io::BufReader, io::BufRead, collections::HashMap, fs, io::Read, process::Command, process::Stdio};
 use tauri::command;
 
 #[command]
@@ -19,6 +18,7 @@ fn open_opilot_window(app: tauri::AppHandle) -> bool {
 
 #[command]
 fn start_chat(json_input: String) -> String {
+    println!("start chat {}", json_input);
     let chat = Command::new("node")
         .arg("gemini.js")
         .arg("startChat")
@@ -116,22 +116,39 @@ fn capture_screen() -> String {
 }
 
 #[command]
-fn query_gemini(prompt: String) -> String {
-    let output = Command::new("node")
-        .arg("gemini.js")
-        .arg("prompt")
-        .arg(prompt)
-        .output()
-        .expect("Failed to execute Node.js script");
-    if !output.status.success() {
-        eprintln!(
-            "Node.js script error: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-        return "".to_string();
+async fn query_gemini(prompt: String) -> Result<String, String> {
+    let mut child = Command::new("node")
+        .arg("gemini.js") 
+        .arg(&prompt)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to start sidecar: {}", e))?;
+
+    let stdout = child.stdout.take().ok_or("Failed to capture stdout")?;
+    let mut reader = BufReader::new(stdout);
+    let mut output = String::new();
+    reader
+        .read_line(&mut output)
+        .map_err(|e| format!("Failed to read stdout: {}", e))?;
+
+    // Wait for the child process to exit.
+    let status = child
+        .wait()
+        .map_err(|e| format!("Failed to wait on child: {}", e))?;
+    if !status.success() {
+        let mut err_output = String::new();
+        if let Some(mut stderr) = child.stderr {
+            BufReader::new(&mut stderr)
+                .read_to_string(&mut err_output)
+                .ok();
+        }
+        return Err(format!("Sidecar exited with error: {}", err_output));
     }
-    let json_output = String::from_utf8_lossy(&output.stdout);
-    json_output.to_string()
+
+    // Here, output is a JSON string. You can pass it as is (or parse it if needed).
+    Ok(output)
 }
 
 #[command]
@@ -166,7 +183,10 @@ fn main() {
             get_image_data,
             query_gemini,
             open_opilot_window,
-            capture_screen
+            capture_screen,
+            start_chat,
+            chat_message,
+            capture_screen,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run app");
