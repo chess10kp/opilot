@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { GeminiIcon } from "@/components/GeminiIcon";
@@ -90,6 +90,16 @@ type ChatMessageType = {
   parts: { text: string }[];
 };
 
+type ChatSessionResponse = {
+  error?: string;
+  sessionId?: string;
+};
+
+type ChatMessageResponse = {
+  error?: string;
+  response?: string;
+};
+
 const ChatWindow = ({ model }: { model: any }) => {
   const [chatPrompt, setChatPrompt] = useState<string>("");
   const [chatHistory, setChatHistory] = useState<ChatMessageType[]>([
@@ -117,64 +127,44 @@ const ChatWindow = ({ model }: { model: any }) => {
 
     let session = chatSession;
     if (!chatStarted || !session) {
-      const chat = await model.startChat({
-        history: history,
+      const chat: ChatSessionResponse = await invoke("start_chat", {
+        json_input: { history: history }.toString(),
       });
-      if (!chat) {
-        console.log("Error starting chat.");
+
+      if (!chat || chat.error) {
+        console.log("Error starting chat.", chat);
         return;
       }
-      setChatSession(chat);
-      setChatStarted(true);
-
-      addMessage({
-        role: "user",
-        parts: [{ text: "Great to meet you. What would you like to do?" }],
-      });
-      addMessage({
-        role: "model",
-        parts: [{ text: "Great to meet you. What would you like to do?" }],
-      });
       setChatSession(chat);
       setChatStarted(true);
     }
 
     addMessage({
       role: "user",
-      parts: [{ text: "Great to meet you. What would you like to do?" }],
+      parts: [{ text: chatPrompt }],
     });
 
     const currentPrompt = chatPrompt;
     setChatPrompt("");
 
-    try {
-      setIsSending(true);
+    setIsSending(true);
 
-      let result = await session.sendMessageStream(currentPrompt);
-      if (!result) {
-        console.log("failed sending message");
-      }
-      let res = "";
+    let result: ChatMessageResponse = await invoke("chat_message", {
+      json_input: {
+        session_id: session.sessionId,
+        message: currentPrompt,
+      }.toString(),
+    });
 
-      for await (const chunk of result.stream) {
-        const chunkText = chunk.text();
-        res += chunkText;
-        setChatHistory((prev) => {
-          if (prev[prev.length - 1].role == "model") {
-            return [
-              ...prev.slice(0, -1),
-              { role: "model", parts: [{ text: res }] },
-            ];
-          } else {
-            return [...prev, { role: "model", parts: [{ text: res }] }];
-          }
-        });
-      }
-    } catch (e) {
-      window.console.log(e);
-    } finally {
-      setIsSending(false);
+    if (!result || result.error) {
+      console.log("failed sending message");
     }
+
+    setChatHistory((prev) => [
+      ...prev,
+      { role: "model", parts: [{ text: result.response?.toString() || "" }] },
+    ]);
+    setIsSending(false);
   };
 
   return (
@@ -211,15 +201,19 @@ const ChatWindow = ({ model }: { model: any }) => {
 export default function CopilotWindow() {
   const [query, setQuery] = useState("");
   const [response, setResponse] = useState("");
+  const [model, setModel] = useState<null | any>(null);
 
   if (!process.env.NEXT_PUBLIC_GOOGLE_API_GEMINI)
     console.log("No API key found");
-  const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_GEMINI || "");
-  // TODO: scrape screen for meeting information
-  const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
-    systemInstruction:
-      'You are an assistant on a sidebar of a Wayland Linux desktop.\
+
+  useEffect(() => {
+    try {
+      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_GEMINI || "");
+      // TODO: scrape screen for meeting information
+      let model = genAI.getGenerativeModel({
+        model: "gemini-1.5-flash",
+        systemInstruction:
+          'You are an assistant on a sidebar of a Wayland Linux desktop.\
     Please always use a casual tone when answering your questions, unlees requested otherwise or making writing suggestions.\
     When making a suggestion, please use the following format: {message: "<your response>", type: <number that I tell you to include>}\n\
     These are the steps you should take to respond to the user\'s queries:\n\
@@ -236,7 +230,12 @@ export default function CopilotWindow() {
     11. Otherwise, when asked to summarize information or explaining concepts, you are should use bullet points and headings.\
     Note: Use casual language, be short, while ensuring the factual correctness of your response. \
     If you are unsure or don’t have enough information to provide a confident answer, simply say “I don’t know” or “I’m not sure.”. \n',
-  });
+      });
+      setModel(model);
+    } catch (e) {
+      console.log("failed to initialize model", e);
+    }
+  }, []);
 
   // TODO: figure out streaming responses
   // const sendPrompt = async () => {
