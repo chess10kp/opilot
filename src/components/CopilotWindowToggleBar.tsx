@@ -36,7 +36,7 @@ export function CopilotWindowToggleBar({ className }: MenuBarProps) {
     <TabsList className="bg-black px-0 rounded-none justify-center items-center inline-flex ">
       {menuItems.map((item, index) => (
         <TabsTrigger key={index} className="rounded-none w-fit h-fit data-[state=active]:bg-background data-[state=active]:text-background shadow-none" value={item.value || ""}>
-          <button
+          <div
             key={index}
             className="w-8 h-8 py-1 rounded-none justify-center items-center gap-2 flex  transition-colors"
             onClick={item.callback}
@@ -50,7 +50,7 @@ export function CopilotWindowToggleBar({ className }: MenuBarProps) {
               </div>
             </div>
             <span className="sr-only">{item.value}</span>
-          </button>
+          </div>
         </TabsTrigger>
       ))}
     </TabsList>
