@@ -18,6 +18,44 @@ fn open_opilot_window(app: tauri::AppHandle) -> bool {
 }
 
 #[command]
+fn start_chat(json_input: String) -> String {
+    let chat = Command::new("node")
+        .arg("gemini.js")
+        .arg("startChat")
+        .arg(json_input)
+        .output()
+        .expect("Failed to execute Node.js script");
+    if !chat.status.success() {
+        eprintln!(
+            "Node.js script error: {}",
+            String::from_utf8_lossy(&chat.stderr)
+        );
+        return "".to_string();
+    }
+    let json_output = String::from_utf8_lossy(&chat.stdout);
+    json_output.to_string()
+}
+
+#[command]
+fn chat_message(json_input: String) -> String {
+    let chat = Command::new("node")
+        .arg("gemini.js")
+        .arg("chat")
+        .arg(json_input)
+        .output()
+        .expect("Failed to execute Node.js script");
+    if !chat.status.success() {
+        eprintln!(
+            "Node.js script error: {}",
+            String::from_utf8_lossy(&chat.stderr)
+        );
+        return "".to_string();
+    }
+    let json_output = String::from_utf8_lossy(&chat.stdout);
+    json_output.to_string()
+}
+
+#[command]
 async fn parse_agenda(text: String) -> String {
     let agenda = Command::new("node")
         .arg("scheduler.js")
