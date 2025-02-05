@@ -100,7 +100,7 @@ type ChatMessageResponse = {
   response?: string;
 };
 
-const ChatWindow = ({ model }: { model: any }) => {
+const ChatWindow = () => {
   const [chatPrompt, setChatPrompt] = useState<string>("");
   const [chatHistory, setChatHistory] = useState<ChatMessageType[]>([
     {
@@ -128,14 +128,17 @@ const ChatWindow = ({ model }: { model: any }) => {
     let session = chatSession;
     if (!chatStarted || !session) {
       const chat: ChatSessionResponse = await invoke("start_chat", {
-        json_input: { history: history }.toString(),
+        jsonInput: JSON.stringify({ history: history }),
       });
 
-      if (!chat || chat.error) {
-        console.log("Error starting chat.", chat);
+      if (!chat || chat.error !== undefined) {
+        console.log(
+          "Error starting chat.",
+          chat,
+          { history: history }.toString(),
+        );
         return;
       }
-      setChatSession(chat);
       setChatStarted(true);
     }
 
@@ -150,10 +153,9 @@ const ChatWindow = ({ model }: { model: any }) => {
     setIsSending(true);
 
     let result: ChatMessageResponse = await invoke("chat_message", {
-      json_input: {
-        session_id: session.sessionId,
+      jsonInput: JSON.stringify({
         message: currentPrompt,
-      }.toString(),
+      }),
     });
 
     if (!result || result.error) {
@@ -201,41 +203,6 @@ const ChatWindow = ({ model }: { model: any }) => {
 export default function CopilotWindow() {
   const [query, setQuery] = useState("");
   const [response, setResponse] = useState("");
-  const [model, setModel] = useState<null | any>(null);
-
-  if (!process.env.NEXT_PUBLIC_GOOGLE_API_GEMINI)
-    console.log("No API key found");
-
-  useEffect(() => {
-    try {
-      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_GEMINI || "");
-      // TODO: scrape screen for meeting information
-      let model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
-        systemInstruction:
-          'You are an assistant on a sidebar of a Wayland Linux desktop.\
-    Please always use a casual tone when answering your questions, unlees requested otherwise or making writing suggestions.\
-    When making a suggestion, please use the following format: {message: "<your response>", type: <number that I tell you to include>}\n\
-    These are the steps you should take to respond to the user\'s queries:\n\
-    1. If it\'s a writing- or grammar-related question or a sentence in quotation marks, Please point out errors and correct when necessary using underlines, and make the writing more natural where appropriate without making too major changes.\
-    return the response type as {message: "<response>", type: 1}\
-    2. If the query is asking you to schedule something return { message: "", type: 2}. This tells the system to return to you more information about the meeting.\
-    3. If you are required to schedule something, get the link of the meeting from the information provided if there is one, \
-    4. If the user is asking to reply to an email or just mentions they want you to reply to something, Then return { message: \"\", type: 3}. This tells the system to return to you more information about the meeting. \
-    5. If the user is asking you to open an application, return the shell command to open the  desired application, with the format {message: \"command\", type: 3}. \
-    6. If the user is asking you to execute a command, refuse in this format {message: \"command\", type: 1}. \
-    8. If the user is asking you to open a website, return the shell command to open the desired website in Firefox, with the format {message: \"command\", type: 4}. \
-    9. If it\'s a question about system tasks, give a bash command in a code block with no explanation, in the format {message: \"command\", type: 5}. \
-    10. For mathematics expressions, you *have to* use LaTeX within a code block with the language set as "latex". \n\
-    11. Otherwise, when asked to summarize information or explaining concepts, you are should use bullet points and headings.\
-    Note: Use casual language, be short, while ensuring the factual correctness of your response. \
-    If you are unsure or don’t have enough information to provide a confident answer, simply say “I don’t know” or “I’m not sure.”. \n',
-      });
-      setModel(model);
-    } catch (e) {
-      console.log("failed to initialize model", e);
-    }
-  }, []);
 
   // TODO: figure out streaming responses
   // const sendPrompt = async () => {
@@ -258,27 +225,27 @@ export default function CopilotWindow() {
     e.preventDefault();
     try {
       // TODO: unbloat string manipulation
-      const res: string = await invoke("query_gemini", { prompt: query });
-      const newres = res
-        .replaceAll("`", "")
-        .replaceAll("\\n", "\n")
-        .slice(1, -1)
-        .replaceAll("\\", "");
-      setResponse(newres);
+      const res: any = await invoke("query_gemini", { prompt: query });
+      console.log("response: ", res.slice(0))
+      const parsed = JSON.parse(res.slice(0)); 
+      if (parsed.error) {
+        setResponse(parsed.error);
+        return;
+      }
+
+      setResponse(parsed.response);
     } catch (err) {
       console.error("Error querying Gemini:", err);
       setResponse("Error occurred while querying the model.");
     }
   };
 
-  const createChat = () => {};
-
   return (
     <div
       className={`fixed top-0 left-0 h-full w-64 flex text-xs flex-col bg-background text-foreground p-4 transition-transform duration-300 -translate-x-0`}
     >
       <Tabs
-        defaultValue="chat"
+        defaultValue="query"
         className="h-[100%] bg-background rounded-none p-0"
       >
         <CopilotWindowToggleBar />
@@ -299,7 +266,7 @@ export default function CopilotWindow() {
           className={`flex border-0 data-[state=active]:outline-none text-xs items-stretch flex-col bg-background text-foreground p-4 transition-transform duration-300 -translate-x-0`}
           value="chat"
         >
-          <ChatWindow model={model} />
+          <ChatWindow />
         </TabsContent>
       </Tabs>
     </div>

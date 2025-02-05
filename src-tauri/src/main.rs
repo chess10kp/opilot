@@ -2,7 +2,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use base64;
-use std::{io::BufReader, io::BufRead, collections::HashMap, fs, io::Read, process::Command, process::Stdio};
+use std::io::{BufRead, BufReader, Write};
+use std::process::{Child, Command, Stdio};
+use std::sync::{Arc, Mutex};
+use std::{collections::HashMap, fs};
 use tauri::command;
 
 #[command]
@@ -16,43 +19,65 @@ fn open_opilot_window(app: tauri::AppHandle) -> bool {
     true
 }
 
-#[command]
-fn start_chat(json_input: String) -> String {
-    println!("start chat {}", json_input);
-    let chat = Command::new("node")
-        .arg("gemini.js")
-        .arg("startChat")
-        .arg(json_input)
-        .output()
-        .expect("Failed to execute Node.js script");
-    if !chat.status.success() {
-        eprintln!(
-            "Node.js script error: {}",
-            String::from_utf8_lossy(&chat.stderr)
-        );
-        return "".to_string();
+struct NodeProcess {
+    child: Child,
+}
+
+impl NodeProcess {
+    fn new() -> Result<Self, String> {
+        let child = Command::new("node")
+            .arg("gemini.js")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .map_err(|e| format!("Failed to spawn node process: {}", e))?;
+        Ok(NodeProcess { child })
     }
-    let json_output = String::from_utf8_lossy(&chat.stdout);
-    json_output.to_string()
+
+    fn send_query(&mut self, query: &str) -> Result<String, String> {
+        let stdin = self
+            .child
+            .stdin
+            .as_mut()
+            .ok_or("Failed to open stdin of node process")?;
+        let request = serde_json::json!({
+            "type": "query",
+            "prompt": query
+        });
+        stdin
+            .write_all(format!("{}\n", request.to_string()).as_bytes())
+            .map_err(|e| format!("Failed to write to node process stdin: {}", e))?;
+
+        let stdout = self
+            .child
+            .stdout
+            .as_mut()
+            .ok_or("Failed to capture stdout of node process")?;
+        let mut reader = BufReader::new(stdout);
+        let mut response_line = String::new();
+        reader
+            .read_line(&mut response_line)
+            .map_err(|e| format!("Failed to read from node process stdout: {}", e))?;
+        Ok(response_line)
+    }
+}
+
+type SharedNodeProcess = Arc<Mutex<NodeProcess>>;
+
+#[command]
+fn query_gemini(prompt: String, node: tauri::State<SharedNodeProcess>) -> Result<String, String> {
+    let mut node_process = node.lock().unwrap();
+    let response = node_process.send_query(&prompt)?;
+    println!("response: {}", response);
+    Ok(response)
 }
 
 #[command]
-fn chat_message(json_input: String) -> String {
-    let chat = Command::new("node")
-        .arg("gemini.js")
-        .arg("chat")
-        .arg(json_input)
-        .output()
-        .expect("Failed to execute Node.js script");
-    if !chat.status.success() {
-        eprintln!(
-            "Node.js script error: {}",
-            String::from_utf8_lossy(&chat.stderr)
-        );
-        return "".to_string();
-    }
-    let json_output = String::from_utf8_lossy(&chat.stdout);
-    json_output.to_string()
+fn shutdown_node(node: tauri::State<SharedNodeProcess>) -> Result<(), String> {
+    let mut node_process = node.lock().unwrap();
+    node_process.child.kill().map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[command]
@@ -116,42 +141,6 @@ fn capture_screen() -> String {
 }
 
 #[command]
-async fn query_gemini(prompt: String) -> Result<String, String> {
-    let mut child = Command::new("node")
-        .arg("gemini.js") 
-        .arg(&prompt)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("Failed to start sidecar: {}", e))?;
-
-    let stdout = child.stdout.take().ok_or("Failed to capture stdout")?;
-    let mut reader = BufReader::new(stdout);
-    let mut output = String::new();
-    reader
-        .read_line(&mut output)
-        .map_err(|e| format!("Failed to read stdout: {}", e))?;
-
-    // Wait for the child process to exit.
-    let status = child
-        .wait()
-        .map_err(|e| format!("Failed to wait on child: {}", e))?;
-    if !status.success() {
-        let mut err_output = String::new();
-        if let Some(mut stderr) = child.stderr {
-            BufReader::new(&mut stderr)
-                .read_to_string(&mut err_output)
-                .ok();
-        }
-        return Err(format!("Sidecar exited with error: {}", err_output));
-    }
-
-    // Here, output is a JSON string. You can pass it as is (or parse it if needed).
-    Ok(output)
-}
-
-#[command]
 fn get_desktop_icons() -> HashMap<String, String> {
     let output = Command::new("node")
         .arg("getIcons.js")
@@ -177,18 +166,18 @@ fn get_desktop_icons() -> HashMap<String, String> {
 }
 
 fn main() {
+    let node_process = NodeProcess::new().expect("Failed to start Node.js sidecar process");
+    let shared_node: SharedNodeProcess = Arc::new(Mutex::new(node_process));
+
     tauri::Builder::default()
+        .manage(shared_node)
         .invoke_handler(tauri::generate_handler![
             get_desktop_icons,
             get_image_data,
             query_gemini,
-            open_opilot_window,
-            capture_screen,
-            start_chat,
-            chat_message,
-            capture_screen,
+            shutdown_node
         ])
         .run(tauri::generate_context!())
-        .expect("failed to run app");
+        .expect("error while running tauri application");
     app_lib::run();
 }

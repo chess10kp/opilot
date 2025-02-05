@@ -2,13 +2,18 @@ const dotenv = require("dotenv");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 dotenv.config();
+let chatSession = null;
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_GEMINI || "");
-// TODO: scrape screen for meeting information
-let model = genAI.getGenerativeModel({
-  model: "gemini-1.5-flash",
-  systemInstruction:
-    'You are an assistant on a sidebar of a Wayland Linux desktop.\
+// TODO: check for missing gemini key
+async function ensureSession() {
+  let model;
+  if (!chatSession) {
+    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_GEMINI || "");
+    // TODO: scrape screen for meeting information
+    model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      systemInstruction:
+        'You are an assistant on a sidebar of a Wayland Linux desktop.\
     Please always use a casual tone when answering your questions, unlees requested otherwise or making writing suggestions.\
     When making a suggestion, please use the following format: {message: "<your response>", type: <number that I tell you to include>}\n\
     These are the steps you should take to respond to the user\'s queries:\n\
@@ -25,12 +30,23 @@ let model = genAI.getGenerativeModel({
     11. Otherwise, when asked to summarize information or explaining concepts, you are should use bullet points and headings.\
     Note: Use casual language, be short, while ensuring the factual correctness of your response. \
     If you are unsure or don’t have enough information to provide a confident answer, simply say “I don’t know” or “I’m not sure.”. \n',
-});
-
-async function prompt(prompt) {
-  const result = await model.generateContent(prompt);
-  console.dir(JSON.stringify(result.response.text()));
+    });
+    chatSession = model
+  }
+  return model;
 }
+
+async function handleQuery(query) {
+  try {
+    await ensureSession();
+    const result = await chatSession.generateContent(query);
+    return { response: result.response.text() };
+  } catch (error) {
+    return { error: error };
+  }
+}
+
+process.stdin.setEncoding("utf8");
 
 function parseArgs(input) {
   console.log(input);
@@ -43,6 +59,29 @@ function parseArgs(input) {
     startChat(args.at(1), args.at(2));
   }
 }
+
+process.stdin.on("data", async (data) => {
+  const lines = data.split("\n").filter((line) => line.trim().length > 0);
+  for (const line of lines) {
+    try {
+      const message = JSON.parse(line);
+      if (message.type === "query" && message.prompt) {
+        const result = await handleQuery(message.prompt);
+        process.stdout.write(JSON.stringify(result) + "\n");
+      } else if (message.type === "exit") {
+        process.exit(0);
+      } else {
+        process.stdout.write(
+          JSON.stringify({ error: "Unknown command" }) + "\n",
+        );
+      }
+    } catch (err) {
+      process.stdout.write(
+        JSON.stringify({ error: "Failed to parse input" }) + "\n",
+      );
+    }
+  }
+});
 
 // TODO: offload json parsing to rust
 async function startChat(input) {
@@ -84,12 +123,3 @@ async function chatMessage(input) {
     depth: null,
   });
 }
-
-process.stdin.on("data", async (data) => {
-  const input = data.toString();
-  console.log(input);
-  if (input.trim() === "exit") {
-    process.exit(0);
-  }
-  parseArgs(input);
-});
