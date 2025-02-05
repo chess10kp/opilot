@@ -50,7 +50,7 @@ async function chatMessage({ chat, history, message }) {
   } catch (e) {
     return { error: "Failed to send message " + e };
   }
-  console.dir(JSON.stringify({ chat: chat }), {
+  console.dir(JSON.stringify({ response: response }), {
     depth: null,
   });
 }
