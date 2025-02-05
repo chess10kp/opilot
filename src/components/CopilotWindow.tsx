@@ -87,14 +87,24 @@ const ChatInput = ({
 
 type ChatMessageType = {
   role: "user" | "model";
-  text: string;
+  parts: { text: string }[];
 };
 
 const ChatWindow = ({ model }: { model: any }) => {
   const [chatPrompt, setChatPrompt] = useState<string>("");
-  const [chatHistory, setChatHistory] = useState<ChatMessageType[]>([]);
+  const [chatHistory, setChatHistory] = useState<ChatMessageType[]>([
+    {
+      role: "user",
+      parts: [{ text: "Hello" }],
+    },
+    {
+      role: "model",
+      parts: [{ text: "Great to meet you. What would you like to do?" }],
+    },
+  ]);
   const [chatStarted, setChatStarted] = useState(false);
   const [chatSession, setChatSession] = useState<any>(null);
+  // TODO: add system instruction based on DE
   const [isSending, setIsSending] = useState<boolean>(false);
 
   const addMessage = (message: ChatMessageType) => {
@@ -102,41 +112,37 @@ const ChatWindow = ({ model }: { model: any }) => {
   };
 
   const handleSubmitChat = async (e: React.FormEvent) => {
-    window.console.log("handleSubmitChat");
-    window.console.log(chatPrompt);
-    window.console.dir(chatHistory, { depth: null });
-    window.console.log(chatSession);
-    window.console.log(chatStarted);
     e.preventDefault();
     if (!chatPrompt.trim()) return;
 
     let session = chatSession;
     if (!chatStarted || !session) {
-      const chat = model.startChat({
-        history: [
-          {
-            role: "user",
-            parts: [{ text: "Hello" }],
-          },
-          {
-            role: "model",
-            parts: [{ text: "Great to meet you. What would you like to do?" }],
-          },
-        ],
+      const chat = await model.startChat({
+        history: history,
       });
+      if (!chat) {
+        console.log("Error starting chat.");
+        return;
+      }
       setChatSession(chat);
       setChatStarted(true);
 
-      addMessage({ role: "user", text: "Hello" });
+      addMessage({
+        role: "user",
+        parts: [{ text: "Great to meet you. What would you like to do?" }],
+      });
       addMessage({
         role: "model",
-        text: "Great to meet you. What would you like to do?",
+        parts: [{ text: "Great to meet you. What would you like to do?" }],
       });
       setChatSession(chat);
       setChatStarted(true);
     }
 
-    addMessage({ role: "user", text: chatPrompt });
+    addMessage({
+      role: "user",
+      parts: [{ text: "Great to meet you. What would you like to do?" }],
+    });
 
     const currentPrompt = chatPrompt;
     setChatPrompt("");
@@ -145,6 +151,9 @@ const ChatWindow = ({ model }: { model: any }) => {
       setIsSending(true);
 
       let result = await session.sendMessageStream(currentPrompt);
+      if (!result) {
+        console.log("failed sending message");
+      }
       let res = "";
 
       for await (const chunk of result.stream) {
@@ -152,9 +161,12 @@ const ChatWindow = ({ model }: { model: any }) => {
         res += chunkText;
         setChatHistory((prev) => {
           if (prev[prev.length - 1].role == "model") {
-            return [...prev.slice(0, -1), { role: "model", text: res }];
+            return [
+              ...prev.slice(0, -1),
+              { role: "model", parts: [{ text: res }] },
+            ];
           } else {
-            return [...prev, { role: "model", text: res }];
+            return [...prev, { role: "model", parts: [{ text: res }] }];
           }
         });
       }
@@ -170,7 +182,11 @@ const ChatWindow = ({ model }: { model: any }) => {
       {chatStarted ? (
         <ScrollArea className="w-full h-[70%] border-0">
           {chatHistory.map((message: ChatMessageType, index: number) => (
-            <ChatMessageType key={index} isBot={false} message={message.text} />
+            <ChatMessageType
+              key={index}
+              isBot={false}
+              message={message.parts[0].text}
+            />
           ))}
         </ScrollArea>
       ) : (
@@ -196,8 +212,9 @@ export default function CopilotWindow() {
   const [query, setQuery] = useState("");
   const [response, setResponse] = useState("");
 
+  if (!process.env.NEXT_PUBLIC_GOOGLE_API_GEMINI)
+    console.log("No API key found");
   const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_GEMINI || "");
-  // TODO: add system instruction based on DE
   // TODO: scrape screen for meeting information
   const model = genAI.getGenerativeModel({
     model: "gemini-1.5-flash",
