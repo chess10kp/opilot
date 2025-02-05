@@ -230,44 +230,50 @@ export default function CopilotWindow() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    let res;
     try {
-      // TODO: unbloat string manipulation
-      const res: any = await invoke("query_gemini", { prompt: query });
-      console.log("response: ", res.slice(0));
-      const parsed = JSON.parse(res.slice(0));
+      res = await invoke("query_gemini", { prompt: query });
 
-      // TODO: check if the message has a type
-      if (parsed.error) {
-        setResponse(parsed.error);
-        return;
-      } else {
-        try {
-          const jsonString = parsed.response.match(/```json\n([\s\S]+)\n```/);
-
-          const cleanJson = jsonString[1];
-
-          try {
-            const parsedObject = JSON.parse(cleanJson);
-            console.log(parsedObject);
-          } catch (error) {
-            console.error("Failed to parse JSON:", error);
-          }
-          const res = JSON.parse(cleanJson);
-          console.log("parsed response: ", res);
-          if (res.type == 3 || res.type == "3") {
-            console.log("Event added");
-            const event = invoke("add_event_to_schedule");
-            setResponse(`Event ${event} added to schedule`);
-            return;
-          }
-        } catch (e) {
-          console.log("Error parsing response: ", e);
-        }
-        setResponse(parsed.response);
-      }
+      if (res == undefined) return;
+      res = res.toString().replace(/'/g, '"').trim().slice(1, -1);
+      console.log(res);
     } catch (err) {
       console.error("Error querying Gemini:", err);
       setResponse("Error occurred while querying the model.");
+      return;
+    }
+
+    const parsed = typeof res === "string" ? JSON.parse(res) : res;
+
+    // TODO: check if the message has a type
+    if (parsed.error) {
+      setResponse(parsed.error);
+      return;
+    } else {
+      try {
+        const jsonString = parsed.response.match(/```json\n([\s\S]+)\n```/);
+
+        const cleanJson = jsonString[1] ? jsonString[1] : jsonString.trim();
+
+        try {
+          const parsedObject = JSON.parse(cleanJson);
+          console.log(parsedObject);
+        } catch (error) {
+          console.error("Failed to parse JSON:", error);
+        }
+        const res = JSON.parse(cleanJson);
+        console.log("parsed response: ", res);
+        if (res.type == 3 || res.type == "3") {
+          console.log("Event added");
+          invoke("add_event_to_schedule").then((res) => {
+            setResponse(`Event ${res} added to schedule`);
+          });
+          return;
+        }
+      } catch (e) {
+        console.log("Error parsing response: ", e);
+      }
+      setResponse(parsed.response);
     }
   };
 

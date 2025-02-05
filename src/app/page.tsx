@@ -11,6 +11,7 @@ import { Clock } from "@/components/Clock";
 import { invoke } from "@tauri-apps/api/core";
 import CopilotWindow from "@/components/CopilotWindow";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import {Wifi, Volume, Battery} from "@/components/Icons"
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -25,25 +26,25 @@ export default function Home() {
     setSidebarOpen(!sidebarOpen);
   };
 
-  // return (
-  //   <>
-  //     <div className="bg-background ">
-  //       <div className="px-4 flex justify-between">
-  //         <div className="flex py-1 gap-x-4 justify-self-center items-center">
-  //           <Win11 className="w-4 h-4" />
-  //           <Winbar toggleSidebar={handleToggleSidebar} />
-  //         </div>
-  //         <div className="flex items-center gap-4">
-  //           <ChevronUp className="text-black" />
-  //           <Wifi className="w-5 h-5 text-black" />
-  //           <Volume className="w-5 h-5 text-black" />
-  //           <Battery className="w-5 h-5 text-black" />
-  //           <Clock />
-  //         </div>
-  //       </div>
-  //     </div>
-  //   </>
-  // );
+  return (
+    <>
+      <div className="bg-background ">
+        <div className="px-4 flex justify-between">
+          <div className="flex py-1 gap-x-4 justify-self-center items-center">
+            <Win11 className="w-4 h-4" />
+            <Winbar toggleSidebar={handleToggleSidebar} />
+          </div>
+          <div className="flex items-center gap-4">
+            <ChevronUp className="text-black" />
+            <Wifi className="w-5 h-5 text-black" />
+            <Volume className="w-5 h-5 text-black" />
+            <Battery className="w-5 h-5 text-black" />
+            <Clock />
+          </div>
+        </div>
+      </div>
+    </>
+  );
   return (
     <CopilotWindow />
   )

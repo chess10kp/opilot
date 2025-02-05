@@ -70,7 +70,6 @@ type SharedNodeProcess = Arc<Mutex<NodeProcess>>;
 fn query_gemini(prompt: String, node: tauri::State<SharedNodeProcess>) -> Result<String, String> {
     let mut node_process = node.lock().unwrap();
     let response = node_process.send_query(&prompt)?;
-    println!("response: {}", response);
     Ok(response)
 }
 
@@ -164,10 +163,11 @@ fn add_event_to_schedule() -> String{
     println!("{}", output);
     let query = format!("An org mode entry looks like this:\n* TODO Schedule this \nSCHEDULED: <2025-02-07 Fri>\n:LOGBOOK:\nLINK: link to meeting?\nACTION: name_of_action\n:END:\n\
         From this text:'{}', generate an org entry", output);
+    let json_query = serde_json::json!({"prompt": query}).to_string();
     let output = Command::new("node")
         .arg("gemini.js")
         .arg("query")
-        .arg(query)
+        .arg(json_query)
         .output()
         .expect("Failed to execute Node.js script");
 
@@ -182,7 +182,7 @@ fn add_event_to_schedule() -> String{
 
     println!("Generated Org Entry: {}", output);
 
-    let file_path = "schedule.org";
+    let file_path = "../../scheduler.org";
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
