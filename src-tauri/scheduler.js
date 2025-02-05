@@ -1,13 +1,13 @@
 const { baseParse } = require("org-file-parser-with-js");
 const fs = require("fs");
-const createWorker = require("tesseract.js")(async () => {
+const createWorker = require("tesseract.js");
+
+async function recognizeImage(image) {
   const worker = await createWorker("eng");
-  const ret = await worker.recognize(
-    "https://tesseract.projectnaptha.com/img/eng_bw.png",
-  );
-  console.log(ret.data.text);
+  const ret = await worker.recognize(image);
   await worker.terminate();
-})();
+  return ret.data.text;
+}
 
 async function parseOrgFile(text) {
   const orgFile = baseParse(text);
@@ -45,22 +45,8 @@ function appendOrgEvent(filePath, entry) {
   });
 }
 
-// TODO: change polling rate
-function startPolling(filePath) {
-  setInterval(async () => {
-    const events = await getScheduledEvents(filePath);
-    events.forEach((event) => {
-      if (event.now) {
-        console.log(`Reminder: "${event.title}" is due soon!`);
-      }
-    });
-  }, 60 * 1000);
-}
-
-startPolling("test.org");
-
 async function getScheduledEvents() {
-  const text = await ReadFile("test.org");
+  const text = await ReadFile("schedule.org");
   const parsed = parseScheduledEvents(text);
 
   if (parsed.length == 0) {
@@ -96,6 +82,9 @@ async function ReadFile(filePath) {
 async function main() {
   if (process.argv[2] === "agenda") {
     console.dir(getScheduledEvents(orgText), { depth: null });
+  } else if (process.argv[2] == "ocr") {
+    const image = await recognizeImage(process.argv[3]);
+    console.log(image);
   }
 }
 

@@ -112,6 +112,7 @@ const ChatWindow = () => {
       parts: [{ text: "Great to meet you. What would you like to do?" }],
     },
   ]);
+  const [agenda, setAgenda] = useState<any>([]);
   const [chatStarted, setChatStarted] = useState(false);
   const [chatSession, setChatSession] = useState<any>(null);
   // TODO: add system instruction based on DE
@@ -119,6 +120,12 @@ const ChatWindow = () => {
 
   const addMessage = (message: ChatMessageType) => {
     setChatHistory((prev) => [...prev, message]);
+  };
+
+  const onHandleAgenda = async () => {
+    const res = await invoke("parse_agenda");
+    console.log("agenda", res);
+    setAgenda(res);
   };
 
   const handleSubmitChat = async (e: React.FormEvent) => {
@@ -226,14 +233,38 @@ export default function CopilotWindow() {
     try {
       // TODO: unbloat string manipulation
       const res: any = await invoke("query_gemini", { prompt: query });
-      console.log("response: ", res.slice(0))
-      const parsed = JSON.parse(res.slice(0)); 
+      console.log("response: ", res.slice(0));
+      const parsed = JSON.parse(res.slice(0));
+
+      // TODO: check if the message has a type
       if (parsed.error) {
         setResponse(parsed.error);
         return;
-      }
+      } else {
+        try {
+          const jsonString = parsed.response.match(/```json\n([\s\S]+)\n```/);
 
-      setResponse(parsed.response);
+          const cleanJson = jsonString[1];
+
+          try {
+            const parsedObject = JSON.parse(cleanJson);
+            console.log(parsedObject);
+          } catch (error) {
+            console.error("Failed to parse JSON:", error);
+          }
+          const res = JSON.parse(cleanJson);
+          console.log("parsed response: ", res);
+          if (res.type == 3 || res.type == "3") {
+            console.log("Event added");
+            const event = invoke("add_event_to_schedule");
+            setResponse(`Event ${event} added to schedule`);
+            return;
+          }
+        } catch (e) {
+          console.log("Error parsing response: ", e);
+        }
+        setResponse(parsed.response);
+      }
     } catch (err) {
       console.error("Error querying Gemini:", err);
       setResponse("Error occurred while querying the model.");
@@ -267,6 +298,10 @@ export default function CopilotWindow() {
           value="chat"
         >
           <ChatWindow />
+        </TabsContent>
+
+        <TabsContent value="agenda">
+          <Button onClick={() => invoke("parse_agenda")}>Open Agenda</Button>
         </TabsContent>
       </Tabs>
     </div>

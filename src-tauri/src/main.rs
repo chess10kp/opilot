@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use base64;
+use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
@@ -157,6 +158,7 @@ fn ocr() -> String {
     String::from_utf8_lossy(&output.stdout).to_string()
 }
 
+#[command]
 fn add_event_to_schedule() -> String{
     let output: String = ocr();
     println!("{}", output);
@@ -177,6 +179,21 @@ fn add_event_to_schedule() -> String{
         return "".to_string();
     }
     let output = String::from_utf8_lossy(&output.stdout);
+
+    println!("Generated Org Entry: {}", output);
+
+    let file_path = "schedule.org";
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(file_path)
+        .expect("Failed to open org file");
+
+    if let Err(e) = writeln!(file, "\n{}", output) {
+        eprintln!("Failed to write org entry: {}", e);
+    } else {
+        println!("Org entry added to file: {}", file_path);
+    }
     output.to_string()
 }
 
@@ -215,6 +232,8 @@ fn main() {
             get_desktop_icons,
             get_image_data,
             query_gemini,
+            add_event_to_schedule,
+            parse_agenda,
             shutdown_node
         ])
         .run(tauri::generate_context!())
