@@ -1,4 +1,13 @@
 const { baseParse } = require("org-file-parser-with-js");
+const fs = require("fs");
+const createWorker = require("tesseract.js")(async () => {
+  const worker = await createWorker("eng");
+  const ret = await worker.recognize(
+    "https://tesseract.projectnaptha.com/img/eng_bw.png",
+  );
+  console.log(ret.data.text);
+  await worker.terminate();
+})();
 
 async function parseOrgFile(text) {
   const orgFile = baseParse(text);
@@ -20,20 +29,39 @@ async function parseScheduledEvents(text) {
     }));
 }
 
-const orgText = `
-* TODO Schedule this 
-SCHEDULED: <2025-02-07 Fri>
-:LOGBOOK:
-LINK: link to meeting?
-ACTION: name_of_action
-:END:
-`;
+function appendOrgEvent(filePath, entry) {
+  // * TODO ${event.title}
+  // SCHEDULED: ${event.scheduled}
+  // `LINK: ${event.link}` : ""}
+  // `ACTION: ${event.action}` : ""}
+  // :END:
+  // `;
+  fs.appendFile(filePath, entry, "utf8", (err) => {
+    if (err) {
+      console.error("Error appending event:", err);
+    } else {
+      console.log("Event appended successfully.");
+    }
+  });
+}
+
+// TODO: change polling rate
+function startPolling(filePath) {
+  setInterval(async () => {
+    const events = await getScheduledEvents(filePath);
+    events.forEach((event) => {
+      if (event.now) {
+        console.log(`Reminder: "${event.title}" is due soon!`);
+      }
+    });
+  }, 60 * 1000);
+}
+
+startPolling("test.org");
 
 async function getScheduledEvents() {
   const text = await ReadFile("test.org");
   const parsed = parseScheduledEvents(text);
-  // check if the date of the task is in next 10 minutes
-  // if yes, add "now: true" to the task, otherwise false
 
   if (parsed.length == 0) {
     return [];

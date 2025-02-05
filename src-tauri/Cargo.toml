@@ -25,3 +25,5 @@ tauri = { version = "2.2.4", features = [] }
 tauri-plugin-log = "2.0.0-rc"
 base64 = "0.22.1"
 tesseract = "0.15.1"
+chrono = "0.4.39"
+notify = "8.0.0"
