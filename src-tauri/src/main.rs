@@ -2,12 +2,14 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use base64;
+use gtk::gdk_pixbuf::ffi::gdk_pixbuf_new_from_inline;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, fs};
 use tauri::command;
+use tauri::{Manager, Window};
 
 #[command]
 fn open_opilot_window(app: tauri::AppHandle) -> bool {
@@ -158,12 +160,12 @@ fn ocr() -> String {
 }
 
 #[command]
-fn add_event_to_schedule() -> String{
+fn add_event_to_schedule() -> String {
     let output: String = ocr();
     println!("{}", output);
     let query = format!("An org mode entry looks like this:\n* TODO Schedule this \nSCHEDULED: <2025-02-07 Fri>\n:LOGBOOK:\nLINK: link to meeting?\nACTION: name_of_action\n:END:\n\
         From this text:'{}', generate an org entry", output);
-    let json_query = serde_json::json!({"prompt": query}).to_string();
+    let json_query = serde_json::json!({ "prompt": query }).to_string();
     let output = Command::new("node")
         .arg("gemini.js")
         .arg("query")
@@ -222,6 +224,24 @@ fn get_desktop_icons() -> HashMap<String, String> {
     }
 }
 
+#[command]
+async fn hide_sidebar(window: Window) {
+    window
+        .get_webview_window("opilot_sidebar")
+        .expect("no window labeled 'splashscreen' found")
+        .hide()
+        .unwrap();
+}
+
+#[command]
+async fn open_sidebar(window: Window) {
+    window
+        .get_webview_window("opilot_sidebar")
+        .expect("no window labeled 'splashscreen' found")
+        .show()
+        .unwrap();
+}
+
 fn main() {
     let node_process = NodeProcess::new().expect("Failed to start Node.js sidecar process");
     let shared_node: SharedNodeProcess = Arc::new(Mutex::new(node_process));
@@ -234,6 +254,8 @@ fn main() {
             query_gemini,
             add_event_to_schedule,
             parse_agenda,
+            open_sidebar,
+            hide_sidebar,
             shutdown_node
         ])
         .run(tauri::generate_context!())

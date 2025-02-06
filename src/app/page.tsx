@@ -1,7 +1,7 @@
-// nextjs-app/pages/index.tsx
 "use client";
+
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button"; // shadcn UI button (or you can create your own)
+import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/Icons";
 import { Win11 } from "@/components/Win11";
 import { Winbar } from "@/components/Winbar";
@@ -11,19 +11,28 @@ import { Clock } from "@/components/Clock";
 import { invoke } from "@tauri-apps/api/core";
 import CopilotWindow from "@/components/CopilotWindow";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import {Wifi, Volume, Battery} from "@/components/Icons"
+import { Wifi, Volume, Battery } from "@/components/Icons";
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarInitialized, setSidebarInitialized] = useState(false);
 
   const handleToggleSidebar = () => {
-    const webView = new WebviewWindow("opilot_sidebar", {
-      url: "http://localhost:3000/opilot",
-      width: 600, 
-      height: 900,
-      decorations: false,
-    });
-    setSidebarOpen(!sidebarOpen);
+    if (!sidebarInitialized) {
+      const webView = new WebviewWindow("opilot_sidebar", {
+        url: "http://localhost:3000/opilot",
+        width: 600,
+        height: 900,
+        decorations: false,
+      });
+      setSidebarInitialized(true);
+    }
+    setSidebarOpen(!sidebarOpen)
+    if (sidebarOpen) {
+      invoke("hide_sidebar")
+    } else {
+      invoke("open_sidebar")
+    }
   };
 
   return (
@@ -45,7 +54,5 @@ export default function Home() {
       </div>
     </>
   );
-  return (
-    <CopilotWindow />
-  )
+  return <CopilotWindow />;
 }
