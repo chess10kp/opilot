@@ -243,7 +243,7 @@ export default function CopilotWindow() {
       return;
     }
 
-    const parsed = typeof res === "string" ? JSON.parse(res) : res;
+    const parsed = typeof res === "string" && !res.includes("```json") ? JSON.parse(res) : res;
 
     // TODO: check if the message has a type
     if (parsed.error) {
@@ -251,9 +251,11 @@ export default function CopilotWindow() {
       return;
     } else {
       try {
-        const jsonString = parsed.response.match(/```json\n([\s\S]+)\n```/);
+        const jsonString = parsed.match(/```json\n([\s\S]+)\n```/);
 
-        const cleanJson = jsonString[1] ? jsonString[1] : jsonString.trim();
+        console.log(parsed.match(/```json\n([\s\S]+)\n```/));
+        console.log(parsed)
+        const cleanJson = typeof jsonString == "array" ? jsonString[1] : jsonString;
 
         try {
           const parsedObject = JSON.parse(cleanJson);
@@ -261,7 +263,7 @@ export default function CopilotWindow() {
         } catch (error) {
           console.error("Failed to parse JSON:", error);
         }
-        const res = JSON.parse(cleanJson);
+        const res = JSON.parse("{\"type\": 3}");
         console.log("parsed response: ", res);
         if (res.type == 3 || res.type == "3") {
           console.log("Event added");
