@@ -2,7 +2,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use base64;
+use gtk::gdk;
 use gtk::gdk_pixbuf::ffi::gdk_pixbuf_new_from_inline;
+use gtk::glib::PropertyGet;
+use gtk::prelude::{ContainerExt, GtkWindowExt, MonitorExt, WidgetExt};
+use gtk_layer_shell::LayerShell;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, Command, Stdio};
@@ -10,17 +14,6 @@ use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, fs};
 use tauri::command;
 use tauri::{Manager, Window};
-
-#[command]
-fn open_opilot_window(app: tauri::AppHandle) -> bool {
-    let win_name = "opilot_sidebar";
-    let _ = tauri::webview::WebviewWindowBuilder::new(
-        &app,
-        win_name,
-        tauri::WebviewUrl::App("opilot".into()),
-    );
-    true
-}
 
 struct NodeProcess {
     child: Child,
@@ -248,6 +241,52 @@ fn main() {
 
     tauri::Builder::default()
         .manage(shared_node)
+        .setup(|app| {
+            let main_window = app.get_webview_window("main").unwrap();
+            main_window.hide().unwrap();
+            // let chat_window = app.get_webview_window("opilot_sidebar").unwrap();
+
+            let gtk_window = gtk::ApplicationWindow::new(
+                &main_window.gtk_window().unwrap().application().unwrap(),
+            );
+
+            gtk_window.set_app_paintable(true);
+
+            let vbox = main_window.default_vbox().unwrap();
+            main_window.gtk_window().unwrap().remove(&vbox);
+            gtk_window.add(&vbox);
+
+            gtk_window.init_layer_shell();
+
+            let display = match gdk::Display::default() {
+                Some(display) => display,
+                None => {
+                    eprintln!("Failed to get default display");
+                    return Ok(());
+                },
+            };
+            let monitors = display.n_monitors();
+
+            for n in 0..monitors {
+                let mon = match display.monitor(n) {
+                    Some(mon) => mon,
+                    None => {
+                        eprintln!("Failed to get monitor {}", n);
+                        return Ok(());
+                    },
+                };
+                let geometry = mon.geometry();
+
+                gtk_window.set_width_request(geometry.width());
+                gtk_window.set_height_request(geometry.height());
+            }
+
+
+            gtk_window.set_layer(gtk_layer_shell::Layer::Bottom);
+            gtk_window.set_keyboard_interactivity(true);
+            gtk_window.show_all();
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             get_desktop_icons,
             get_image_data,
