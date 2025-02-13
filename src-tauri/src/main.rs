@@ -1,12 +1,9 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use base64;
 use gtk::gdk;
-use gtk::gdk_pixbuf::ffi::gdk_pixbuf_new_from_inline;
-use gtk::glib::PropertyGet;
 use gtk::prelude::{ContainerExt, GtkWindowExt, MonitorExt, WidgetExt};
-use gtk_layer_shell::LayerShell;
+use gtk_layer_shell::{Edge, LayerShell};
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, Command, Stdio};
@@ -42,7 +39,7 @@ impl NodeProcess {
             "prompt": query
         });
         stdin
-            .write_all(format!("{}\n", request.to_string()).as_bytes())
+            .write_all(format!("{}\n", request).as_bytes())
             .map_err(|e| format!("Failed to write to node process stdin: {}", e))?;
 
         let stdout = self
@@ -101,14 +98,14 @@ async fn get_image_data(image_path: String) -> Result<String, String> {
             return Ok("".to_string());
         }
 
-        let canonical_path = std::fs::canonicalize(&image_path)
+        let canonical_path = std::fs::canonicalize(image_path)
             .map_err(|e| format!("Failed to resolve path: {} {}", image_path, e))?;
         let _image_data =
             fs::read(canonical_path).map_err(|e| format!("Failed to read image: {}", e))?;
         return Ok("".to_string());
     }
 
-    match fs::read(&image_path) {
+    match fs::read(image_path) {
         Ok(image_data) => {
             let base64_image = base64::encode(image_data);
             Ok(format!("data:image/png;base64,{}", base64_image))
@@ -278,12 +275,16 @@ fn main() {
                 let geometry = mon.geometry();
 
                 gtk_window.set_width_request(geometry.width());
-                gtk_window.set_height_request(geometry.height());
+                gtk_window.set_height_request(geometry.height() / 20);
+                gtk_window.set_margin_bottom(0);
+                gtk_window.set_margin_end(0);
+                gtk_window.set_exclusive_zone(geometry.height() / 20);
+                gtk_window.set_anchor(Edge::Bottom, true);
             }
 
-
             gtk_window.set_layer(gtk_layer_shell::Layer::Bottom);
-            gtk_window.set_keyboard_interactivity(true);
+            gtk_window.set_keyboard_interactivity(false);
+            // gtk_window.gtk_layer_set_keyboard_mode();
             gtk_window.show_all();
             Ok(())
         })
