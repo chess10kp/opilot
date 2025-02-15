@@ -14,12 +14,7 @@
             {
                 "decorations": false,
                 "title": "opilot_sidebar",
-                "resizable": false,
-                "fullscreen": false,
-                "maximizable": false,
-                "minimizable": false,
-                "closable": false
-        
+                "resizable": false
       }
     ],
     "security": {

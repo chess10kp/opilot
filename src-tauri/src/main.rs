@@ -278,13 +278,12 @@ fn main() {
 
                 gtk_window.set_width_request(width);
                 gtk_window.set_height_request(height / 20);
-                gtk_window.set_exclusive_zone(height / 20);
             }
             gtk_window.set_margin_bottom(0);
             gtk_window.set_margin_end(0);
             gtk_window.set_anchor(Edge::Bottom, true);
 
-            gtk_window.set_layer(gtk_layer_shell::Layer::Bottom);
+            gtk_window.set_layer(gtk_layer_shell::Layer::Top);
             gtk_window.set_keyboard_interactivity(false);
             gtk_window.show_all();
 
@@ -292,16 +291,32 @@ fn main() {
                 .decorations(false)
                 .resizable(false)
                 .browser_extensions_enabled(false)
-                .always_on_top(true)
                 .build()
                 .unwrap();
 
             let sidebar = app.get_webview_window("opilot_sidebar").unwrap();
-            sidebar.hide().unwrap();
+            // sidebar.hide().unwrap();
 
-            let gtk_sidebar = sidebar.gtk_window().unwrap();
-            gtk_sidebar.set_app_paintable(true);
+
+
+
+            let gtk_sidebar = gtk::ApplicationWindow::new(
+                &sidebar.gtk_window().unwrap().application().unwrap(),
+            );
+
+            let vbox = sidebar.default_vbox().unwrap();
+            sidebar.gtk_window().unwrap().remove(&vbox);
+            gtk_sidebar.add(&vbox);
+
+            gtk_sidebar.init_layer_shell();
+            gtk_sidebar.set_margin_bottom(0);
+            gtk_sidebar.set_margin_top(0);
+            gtk_sidebar.set_margin_end(0);
+            gtk_sidebar.set_margin_start(0);
+            gtk_sidebar.set_anchor(Edge::Right, true);
+            gtk_sidebar.set_anchor(Edge::Top, true);
             gtk_sidebar.set_layer(gtk_layer_shell::Layer::Top);
+            gtk_sidebar.set_keyboard_interactivity(false);
 
             for n in 0..monitors {
                 let mon = match display.monitor(n) {
@@ -316,14 +331,9 @@ fn main() {
                 let height = geometry.height();
                 println!("Geometry: {} {}", width, height);
 
-                gtk_sidebar.set_width_request(width / 4);
                 gtk_sidebar.set_height_request(height - height / 20);
+                gtk_sidebar.set_width_request(550);
             }
-
-            gtk_sidebar.init_layer_shell();
-            gtk_sidebar.set_margin_bottom(0);
-            gtk_sidebar.set_margin_end(0);
-            gtk_sidebar.set_anchor(Edge::Right, true);
 
             gtk_sidebar.show_all();
 
