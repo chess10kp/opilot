@@ -218,7 +218,7 @@ fn get_desktop_icons() -> HashMap<String, String> {
 async fn hide_sidebar(window: Window) {
     window
         .get_webview_window("opilot_sidebar")
-        .expect("no window labeled 'splashscreen' found")
+        .expect("no window labeled 'opilot_sidebar' found")
         .hide()
         .unwrap();
 }
@@ -247,6 +247,15 @@ fn main() {
                 &main_window.gtk_window().unwrap().application().unwrap(),
             );
 
+            let sidewindiow = tauri::WebviewWindowBuilder::new(
+                app,
+                "opilot_sidebar",
+                tauri::WebviewUrl::External("https://example.com".parse().unwrap()),
+            )
+            .title("opilot_sidebar")
+            .build()
+            .expect("Failed to create window");
+
             gtk_window.set_app_paintable(true);
 
             let vbox = main_window.default_vbox().unwrap();
@@ -260,7 +269,7 @@ fn main() {
                 None => {
                     eprintln!("Failed to get default display");
                     return Ok(());
-                },
+                }
             };
             let monitors = display.n_monitors();
 
@@ -270,9 +279,10 @@ fn main() {
                     None => {
                         eprintln!("Failed to get monitor {}", n);
                         return Ok(());
-                    },
+                    }
                 };
                 let geometry = mon.geometry();
+                println!("Geometry: {} {}", geometry.width(), geometry.height());
 
                 gtk_window.set_width_request(geometry.width());
                 gtk_window.set_height_request(geometry.height() / 20);
