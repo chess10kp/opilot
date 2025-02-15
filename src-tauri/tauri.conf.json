@@ -1,23 +1,25 @@
 {
-  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "opilot",
-  "version": "0.1.0",
-  "identifier": "com.tauri.dev",
-  "build": {
-    "frontendDist": "../out",
-    "devUrl": "http://localhost:3000",
-    "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build"
-  },
-  "app": {
-    "windows": [
-      {
-        "decorations": false,
-        "title": "opilot status",
-        "width": 1920,
-        "height": 30,
-        "resizable": true,
-        "fullscreen": false
+    "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+    "productName": "opilot",
+    "version": "0.1.0",
+    "identifier": "com.opilot.dev",
+    "build": {
+        "frontendDist": "../out",
+        "devUrl": "http://localhost:3000",
+        "beforeDevCommand": "pnpm dev",
+        "beforeBuildCommand": "pnpm build"
+    },
+    "app": {
+        "windows": [
+            {
+                "decorations": false,
+                "title": "opilot_sidebar",
+                "resizable": false,
+                "fullscreen": false,
+                "maximizable": false,
+                "minimizable": false,
+                "closable": false
+        
       }
     ],
     "security": {

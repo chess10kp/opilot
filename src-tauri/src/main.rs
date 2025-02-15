@@ -291,8 +291,41 @@ fn main() {
             WebviewWindowBuilder::new(app, "opilot_sidebar", WebviewUrl::App("opilot".into()))
                 .decorations(false)
                 .resizable(false)
+                .browser_extensions_enabled(false)
+                .always_on_top(true)
                 .build()
                 .unwrap();
+
+            let sidebar = app.get_webview_window("opilot_sidebar").unwrap();
+            sidebar.hide().unwrap();
+
+            let gtk_sidebar = sidebar.gtk_window().unwrap();
+            gtk_sidebar.set_app_paintable(true);
+            gtk_sidebar.set_layer(gtk_layer_shell::Layer::Top);
+
+            for n in 0..monitors {
+                let mon = match display.monitor(n) {
+                    Some(mon) => mon,
+                    None => {
+                        eprintln!("Failed to get monitor {}", n);
+                        return Ok(());
+                    }
+                };
+                let geometry = mon.geometry();
+                let width = geometry.width();
+                let height = geometry.height();
+                println!("Geometry: {} {}", width, height);
+
+                gtk_sidebar.set_width_request(width / 4);
+                gtk_sidebar.set_height_request(height - height / 20);
+            }
+
+            gtk_sidebar.init_layer_shell();
+            gtk_sidebar.set_margin_bottom(0);
+            gtk_sidebar.set_margin_end(0);
+            gtk_sidebar.set_anchor(Edge::Right, true);
+
+            gtk_sidebar.show_all();
 
             Ok(())
         })
