@@ -9,7 +9,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, fs};
-use tauri::command;
+use tauri::{command, WebviewUrl, WebviewWindowBuilder};
 use tauri::{Manager, Window};
 
 struct NodeProcess {
@@ -241,20 +241,10 @@ fn main() {
         .setup(|app| {
             let main_window = app.get_webview_window("main").unwrap();
             main_window.hide().unwrap();
-            // let chat_window = app.get_webview_window("opilot_sidebar").unwrap();
 
             let gtk_window = gtk::ApplicationWindow::new(
                 &main_window.gtk_window().unwrap().application().unwrap(),
             );
-
-            let sidewindiow = tauri::WebviewWindowBuilder::new(
-                app,
-                "opilot_sidebar",
-                tauri::WebviewUrl::External("https://example.com".parse().unwrap()),
-            )
-            .title("opilot_sidebar")
-            .build()
-            .expect("Failed to create window");
 
             gtk_window.set_app_paintable(true);
 
@@ -282,20 +272,28 @@ fn main() {
                     }
                 };
                 let geometry = mon.geometry();
-                println!("Geometry: {} {}", geometry.width(), geometry.height());
+                let width = geometry.width();
+                let height = geometry.height();
+                println!("Geometry: {} {}", width, height);
 
-                gtk_window.set_width_request(geometry.width());
-                gtk_window.set_height_request(geometry.height() / 20);
-                gtk_window.set_margin_bottom(0);
-                gtk_window.set_margin_end(0);
-                gtk_window.set_exclusive_zone(geometry.height() / 20);
-                gtk_window.set_anchor(Edge::Bottom, true);
+                gtk_window.set_width_request(width);
+                gtk_window.set_height_request(height / 20);
+                gtk_window.set_exclusive_zone(height / 20);
             }
+            gtk_window.set_margin_bottom(0);
+            gtk_window.set_margin_end(0);
+            gtk_window.set_anchor(Edge::Bottom, true);
 
             gtk_window.set_layer(gtk_layer_shell::Layer::Bottom);
             gtk_window.set_keyboard_interactivity(false);
-            // gtk_window.gtk_layer_set_keyboard_mode();
             gtk_window.show_all();
+
+            WebviewWindowBuilder::new(app, "opilot_sidebar", WebviewUrl::App("opilot".into()))
+                .decorations(false)
+                .resizable(false)
+                .build()
+                .unwrap();
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
