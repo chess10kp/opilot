@@ -4,9 +4,11 @@
 use gtk::gdk;
 use gtk::prelude::{ContainerExt, GtkWindowExt, MonitorExt, WidgetExt};
 use gtk_layer_shell::{Edge, LayerShell};
+use std::cell::RefCell;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, Command, Stdio};
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, fs};
 use tauri::{command, WebviewUrl, WebviewWindowBuilder};
@@ -217,6 +219,7 @@ fn get_desktop_icons() -> HashMap<String, String> {
 #[command]
 async fn hide_sidebar(window: Window) {
     window
+        .app_handle()
         .get_webview_window("opilot_sidebar")
         .expect("no window labeled 'opilot_sidebar' found")
         .hide()
@@ -224,8 +227,30 @@ async fn hide_sidebar(window: Window) {
 }
 
 #[command]
+async fn toggle_sidebar(window: Window) {
+    let window = window
+        .app_handle()
+        .get_webview_window("opilot_sidebar")
+        .unwrap();
+    let gtk_sidebar = window.gtk_window().unwrap();
+
+    match window.is_visible() {
+        Ok(visible) => match visible {
+            true => {
+                gtk_sidebar.hide();
+            }
+            false => {
+                gtk_sidebar.show();
+            }
+        },
+        Err(e) => println!("Error checking visibility: {}", e),
+    }
+}
+
+#[command]
 async fn open_sidebar(window: Window) {
     window
+        .app_handle()
         .get_webview_window("opilot_sidebar")
         .expect("no window labeled 'splashscreen' found")
         .show()
@@ -239,7 +264,7 @@ fn main() {
     tauri::Builder::default()
         .manage(shared_node)
         .setup(|app| {
-            let main_window = app.get_webview_window("main").unwrap();
+            let main_window = app.get_webview_window("statusbar").unwrap();
             main_window.hide().unwrap();
 
             let gtk_window = gtk::ApplicationWindow::new(
@@ -286,37 +311,35 @@ fn main() {
             gtk_window.set_layer(gtk_layer_shell::Layer::Top);
             gtk_window.set_keyboard_interactivity(false);
             gtk_window.show_all();
+            gtk_window.auto_exclusive_zone_enable();
 
-            WebviewWindowBuilder::new(app, "opilot_sidebar", WebviewUrl::App("opilot".into()))
-                .decorations(false)
-                .resizable(false)
-                .browser_extensions_enabled(false)
-                .build()
-                .unwrap();
+
+            // let gtk_sidebar =
+            //     gtk::ApplicationWindow::new(&sidebar.gtk_window().unwrap().application().unwrap());
 
             let sidebar = app.get_webview_window("opilot_sidebar").unwrap();
-            // sidebar.hide().unwrap();
+            sidebar.hide().unwrap();
 
-
-
-
-            let gtk_sidebar = gtk::ApplicationWindow::new(
+            let gtk_window = gtk::ApplicationWindow::new(
                 &sidebar.gtk_window().unwrap().application().unwrap(),
             );
 
+            gtk_window.set_app_paintable(true);
+
             let vbox = sidebar.default_vbox().unwrap();
             sidebar.gtk_window().unwrap().remove(&vbox);
-            gtk_sidebar.add(&vbox);
+            gtk_window.add(&vbox);
 
-            gtk_sidebar.init_layer_shell();
-            gtk_sidebar.set_margin_bottom(0);
-            gtk_sidebar.set_margin_top(0);
-            gtk_sidebar.set_margin_end(0);
-            gtk_sidebar.set_margin_start(0);
-            gtk_sidebar.set_anchor(Edge::Right, true);
-            gtk_sidebar.set_anchor(Edge::Top, true);
-            gtk_sidebar.set_layer(gtk_layer_shell::Layer::Top);
-            gtk_sidebar.set_keyboard_interactivity(false);
+            gtk_window.init_layer_shell();
+
+            let display = match gdk::Display::default() {
+                Some(display) => display,
+                None => {
+                    eprintln!("Failed to get default display");
+                    return Ok(());
+                }
+            };
+            let monitors = display.n_monitors();
 
             for n in 0..monitors {
                 let mon = match display.monitor(n) {
@@ -331,11 +354,18 @@ fn main() {
                 let height = geometry.height();
                 println!("Geometry: {} {}", width, height);
 
-                gtk_sidebar.set_height_request(height - height / 20);
-                gtk_sidebar.set_width_request(550);
+                gtk_window.set_width_request( width / 5);
+                gtk_window.set_height_request(height);
             }
+            gtk_window.set_anchor(Edge::Right, true);
 
-            gtk_sidebar.show_all();
+            gtk_window.set_layer(gtk_layer_shell::Layer::Bottom);
+            gtk_window.set_keyboard_interactivity(false);
+            gtk_window.show_all();
+            gtk_window.auto_exclusive_zone_enable();
+
+
+            app.manage(Arc::new(Mutex::new(sidebar.clone())));
 
             Ok(())
         })
@@ -347,7 +377,8 @@ fn main() {
             parse_agenda,
             open_sidebar,
             hide_sidebar,
-            shutdown_node
+            shutdown_node,
+            toggle_sidebar
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

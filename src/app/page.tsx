@@ -18,15 +18,15 @@ export default function Home() {
   const [sidebarInitialized, setSidebarInitialized] = useState(false);
 
   const handleToggleSidebar = () => {
-    if (!sidebarInitialized) {
-      const webView = new WebviewWindow("opilot_sidebar", {
-        url: "http://localhost:3000/opilot",
-        width: 600,
-        height: 900,
-        decorations: false,
-      });
-      setSidebarInitialized(true);
-    }
+    // if (!sidebarInitialized) {
+    //   const webView = new WebviewWindow("opilot_sidebar", {
+    //     url: "http://localhost:3000/opilot",
+    //     width: 600,
+    //     height: 900,
+    //     decorations: false,
+    //   });
+    //   setSidebarInitialized(true);
+    // }
     setSidebarOpen(!sidebarOpen)
     if (sidebarOpen) {
       invoke("hide_sidebar")
@@ -45,14 +45,13 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-4">
             <ChevronUp className="text-black" />
-            <Wifi className="w-5 h-5 text-black" />
-            <Volume className="w-5 h-5 text-black" />
-            <Battery className="w-5 h-5 text-black" />
+            <Wifi className="w-4 h-4 text-black" />
+            <Volume className="w-4 h-4 text-black" />
+            <Battery className="w-4 h-4 text-black" />
             <Clock />
           </div>
         </div>
       </div>
     </>
   );
-  return <CopilotWindow />;
 }
