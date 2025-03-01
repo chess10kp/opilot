@@ -1,8 +1,8 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use gtk::gdk;
-use gtk::prelude::{ContainerExt, GtkWindowExt, MonitorExt, WidgetExt};
+use gtk::{gdk, glib};
+use gtk::prelude::{ApplicationWindowExt, ContainerExt, GtkWindowExt, MonitorExt, WidgetExt};
 use gtk_layer_shell::{Edge, LayerShell};
 use std::cell::RefCell;
 use std::fs::OpenOptions;
@@ -11,7 +11,7 @@ use std::process::{Child, Command, Stdio};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, fs};
-use tauri::{command, WebviewUrl, WebviewWindowBuilder};
+use tauri::{command, AppHandle, State, WebviewUrl, WebviewWindowBuilder};
 use tauri::{Manager, Window};
 
 struct NodeProcess {
@@ -227,27 +227,6 @@ async fn hide_sidebar(window: Window) {
 }
 
 #[command]
-async fn toggle_sidebar(window: Window) {
-    let window = window
-        .app_handle()
-        .get_webview_window("opilot_sidebar")
-        .unwrap();
-    let gtk_sidebar = window.gtk_window().unwrap();
-
-    match window.is_visible() {
-        Ok(visible) => match visible {
-            true => {
-                gtk_sidebar.hide();
-            }
-            false => {
-                gtk_sidebar.show();
-            }
-        },
-        Err(e) => println!("Error checking visibility: {}", e),
-    }
-}
-
-#[command]
 async fn open_sidebar(window: Window) {
     window
         .app_handle()
@@ -255,6 +234,27 @@ async fn open_sidebar(window: Window) {
         .expect("no window labeled 'splashscreen' found")
         .show()
         .unwrap();
+}
+
+thread_local! {
+    static SIDEBAR_ID: RefCell<Option<gtk::ApplicationWindow>> = RefCell::new(None);
+}
+
+#[command]
+fn toggle_sidebar() -> Result<(), String> {
+    glib::idle_add_local(move || {
+        SIDEBAR_ID.with(|sidebar_cell| {
+            if let Some(sidebar) = sidebar_cell.borrow().as_ref() {
+                if sidebar.is_visible() {
+                    sidebar.hide();
+                } else {
+                    sidebar.show();
+                }
+            }
+        });
+        glib::ControlFlow::Break
+    });
+    Ok(())
 }
 
 fn main() {
@@ -313,16 +313,14 @@ fn main() {
             gtk_window.show_all();
             gtk_window.auto_exclusive_zone_enable();
 
-
             // let gtk_sidebar =
             //     gtk::ApplicationWindow::new(&sidebar.gtk_window().unwrap().application().unwrap());
 
             let sidebar = app.get_webview_window("opilot_sidebar").unwrap();
             sidebar.hide().unwrap();
 
-            let gtk_window = gtk::ApplicationWindow::new(
-                &sidebar.gtk_window().unwrap().application().unwrap(),
-            );
+            let gtk_window =
+                gtk::ApplicationWindow::new(&sidebar.gtk_window().unwrap().application().unwrap());
 
             gtk_window.set_app_paintable(true);
 
@@ -354,7 +352,7 @@ fn main() {
                 let height = geometry.height();
                 println!("Geometry: {} {}", width, height);
 
-                gtk_window.set_width_request( width / 5);
+                gtk_window.set_width_request(width / 5);
                 gtk_window.set_height_request(height);
             }
             gtk_window.set_anchor(Edge::Right, true);
@@ -364,8 +362,9 @@ fn main() {
             gtk_window.show_all();
             gtk_window.auto_exclusive_zone_enable();
 
-
-            app.manage(Arc::new(Mutex::new(sidebar.clone())));
+            SIDEBAR_ID.with(|sidebar_cell| {
+                *sidebar_cell.borrow_mut() = Some(gtk_window.clone());
+            });
 
             Ok(())
         })
