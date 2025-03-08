@@ -1,17 +1,19 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use gtk::ffi::GtkWindow;
 use gtk::prelude::{ContainerExt, GtkWindowExt, MonitorExt, WidgetExt};
-use gtk::{gdk, glib};
+use gtk::{gdk, glib, ApplicationWindow};
 use gtk_layer_shell::{Edge, LayerShell};
 use std::cell::RefCell;
+use std::env::home_dir;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, fs};
-use tauri::{command, AppHandle};
+use tauri::{command, AppHandle, WebviewWindow};
 use tauri::{Manager, Window};
 
 struct NodeProcess {
@@ -260,7 +262,7 @@ fn toggle_sidebar() -> Result<(), String> {
 }
 
 fn launch_application() {
-    let home_dir = std::env::home_dir()
+    let home_dir = home_dir()
         .expect("Unable to get home directory")
         .to_str()
         .expect("Unable to get home directory")
@@ -318,58 +320,66 @@ fn launch_application() {
     });
 }
 
-fn open_selection_window(app: AppHandle) {
-    let sidebar_window = tauri::WebviewWindow::builder(&app.clone(), "selection_window", tauri::WebviewUrl::App("selection".into()));
-    let sidebar = app.get_webview_window("opilot_sidebar").unwrap();
-    sidebar.hide().unwrap();
+fn init_gtk_window(win: & WebviewWindow) -> gtk::ApplicationWindow  {
+    let gtk_selection_window = win.gtk_window().unwrap();
 
-    let gtk_window =
-        gtk::ApplicationWindow::new(&sidebar.gtk_window().unwrap().application().unwrap());
+    gtk_selection_window.set_app_paintable(true);
 
-    gtk_window.set_app_paintable(true);
+    let vbox = win.default_vbox().unwrap();
+    win.gtk_window().unwrap().remove(&vbox);
+    gtk_selection_window.add(&vbox);
 
-    let vbox = sidebar.default_vbox().unwrap();
-    sidebar.gtk_window().unwrap().remove(&vbox);
-    gtk_window.add(&vbox);
+    gtk_selection_window.init_layer_shell();
 
-    gtk_window.init_layer_shell();
-
-    let display = match gdk::Display::default() {
-        Some(display) => display,
-        None => {
-            eprintln!("Failed to get default display");
-            return ;
-        }
-    };
+    let display = gdk::Display::default().expect("Failed to get default display");
     let monitors = display.n_monitors();
 
     for n in 0..monitors {
-        let mon = match display.monitor(n) {
-            Some(mon) => mon,
-            None => {
-                eprintln!("Failed to get monitor {}", n);
-                return ;
-            }
-        };
+        let mon = display.monitor(n).expect("Failed to get monitor");
         let geometry = mon.geometry();
         let width = geometry.width();
         let height = geometry.height();
         println!("Geometry: {} {}", width, height);
 
-        gtk_window.set_width_request(width / 5);
-        gtk_window.set_height_request(height);
+        gtk_selection_window.set_width_request(width / 5);
+        gtk_selection_window.set_height_request(height);
     }
-    gtk_window.set_anchor(Edge::Right, true);
+    gtk_selection_window.set_anchor(Edge::Right, true);
 
-    gtk_window.set_layer(gtk_layer_shell::Layer::Bottom);
-    gtk_window.set_keyboard_interactivity(true);
-    gtk_window.show_all();
-    gtk_window.auto_exclusive_zone_enable();
+    gtk_selection_window.set_layer(gtk_layer_shell::Layer::Bottom);
+    gtk_selection_window.set_keyboard_interactivity(true);
 
-    SIDEBAR_ID.with(|sidebar_cell| {
-        *sidebar_cell.borrow_mut() = Some(gtk_window.clone());
-    });
-    gtk_window.hide();
+    gtk_selection_window
+}
+
+#[command]
+fn open_selection_window(app: AppHandle) {
+    if SELECTION_ID.with(|selection_cell| selection_cell.borrow().is_some()) {
+        SELECTION_ID.with(|selection_cell| {
+            if let Some(selection) = selection_cell.borrow().as_ref() {
+                if selection.is_visible() {
+                    selection.hide();
+                } else {
+                    selection.show();
+                }
+            }
+        });
+    } else {
+        let selection_window = tauri::WebviewWindowBuilder::new(
+            &app.clone(),
+            "selection_window",
+            tauri::WebviewUrl::App("selection".into()),
+        ).build().expect("Unable to create selection window");
+        selection_window.hide().unwrap();
+
+        let gtk_selection_window = init_gtk_window(& selection_window);
+
+
+        SELECTION_ID.with(|sidebar_cell| {
+            *sidebar_cell.borrow_mut() = Some(gtk_selection_window.clone());
+        });
+        gtk_selection_window.hide();
+    }
 }
 
 fn main() {
@@ -490,7 +500,8 @@ fn main() {
             open_sidebar,
             hide_sidebar,
             shutdown_node,
-            toggle_sidebar
+            toggle_sidebar,
+            open_selection_window
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
