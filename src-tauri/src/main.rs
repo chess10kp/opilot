@@ -1,17 +1,17 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use gtk::prelude::{ContainerExt, GtkWindowExt, MonitorExt, WidgetExt};
 use gtk::{gdk, glib};
-use gtk::prelude::{ApplicationWindowExt, ContainerExt, GtkWindowExt, MonitorExt, WidgetExt};
 use gtk_layer_shell::{Edge, LayerShell};
 use std::cell::RefCell;
+use std::fs::File;
 use std::fs::OpenOptions;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Child, Command, Stdio};
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, fs};
-use tauri::{command, AppHandle, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::command;
 use tauri::{Manager, Window};
 
 struct NodeProcess {
@@ -172,6 +172,7 @@ fn add_event_to_schedule() -> String {
         );
         return "".to_string();
     }
+
     let output = String::from_utf8_lossy(&output.stdout);
 
     println!("Generated Org Entry: {}", output);
@@ -237,7 +238,7 @@ async fn open_sidebar(window: Window) {
 }
 
 thread_local! {
-    static SIDEBAR_ID: RefCell<Option<gtk::ApplicationWindow>> = RefCell::new(None);
+    static SIDEBAR_ID: RefCell<Option<gtk::ApplicationWindow>> = const {RefCell::new(None) };
 }
 
 #[command]
@@ -255,6 +256,65 @@ fn toggle_sidebar() -> Result<(), String> {
         glib::ControlFlow::Break
     });
     Ok(())
+}
+
+fn launch_application() {
+    let home_dir = std::env::home_dir()
+        .expect("Unable to get home directory")
+        .to_str()
+        .expect("Unable to get home directory")
+        .to_owned()
+        + "/.local/share/applications";
+
+    let desktop_entry_dir = ["/usr/share/applications", &home_dir];
+
+    let mut desktop_entry_map = HashMap::<String, String>::new();
+
+    desktop_entry_dir.into_iter().for_each(|dir| {
+        for entry in fs::read_dir(dir).unwrap() {
+            let entry: std::fs::DirEntry = entry.unwrap();
+
+            // [Desktop Entry]
+            // Name=Qt 6 Assistant
+            // Type=Application
+            // Exec=assistant6
+            // TryExec=assistant6
+            // Icon=assistant6
+            // Categories=Qt;Development;Documentation;
+            // Comment=Tool for viewing online documentation in Qt help file format
+
+            let mut file = File::open(entry.path()).expect("Unable to open application directory");
+
+            let mut contents = String::new();
+            let _ = file.read_to_string(&mut contents);
+
+            println!("{}", contents);
+
+            let contents = contents.lines();
+
+            // map the name of the application with the command in exec
+            let mut name = String::new();
+
+            for line in contents {
+                let line = line.trim();
+                if line.starts_with("Name=") {
+                    name = line
+                        .split("=")
+                        .nth(1)
+                        .map(|s| s.to_string())
+                        .expect("Malformed desktop entry");
+                } else if line.starts_with("Exec=") {
+                    let exec = line.split("=").nth(1).map(|s| s.to_string());
+                    if let Some(exec) = exec {
+                        desktop_entry_map.insert(name.to_string(), exec);
+                    }
+                }
+            }
+        }
+        for (name, path) in &desktop_entry_map {
+            println!("{} -> {}", name, path);
+        }
+    });
 }
 
 fn main() {
@@ -313,9 +373,6 @@ fn main() {
             gtk_window.show_all();
             gtk_window.auto_exclusive_zone_enable();
 
-            // let gtk_sidebar =
-            //     gtk::ApplicationWindow::new(&sidebar.gtk_window().unwrap().application().unwrap());
-
             let sidebar = app.get_webview_window("opilot_sidebar").unwrap();
             sidebar.hide().unwrap();
 
@@ -358,13 +415,14 @@ fn main() {
             gtk_window.set_anchor(Edge::Right, true);
 
             gtk_window.set_layer(gtk_layer_shell::Layer::Bottom);
-            gtk_window.set_keyboard_interactivity(false);
+            gtk_window.set_keyboard_interactivity(true);
             gtk_window.show_all();
             gtk_window.auto_exclusive_zone_enable();
 
             SIDEBAR_ID.with(|sidebar_cell| {
                 *sidebar_cell.borrow_mut() = Some(gtk_window.clone());
             });
+            gtk_window.hide();
 
             Ok(())
         })
