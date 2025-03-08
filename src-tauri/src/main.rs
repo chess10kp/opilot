@@ -261,7 +261,7 @@ fn toggle_sidebar() -> Result<(), String> {
     Ok(())
 }
 
-fn launch_application() {
+fn get_desktop_entries() -> HashMap<String, String> {
     let home_dir = home_dir()
         .expect("Unable to get home directory")
         .to_str()
@@ -318,10 +318,20 @@ fn launch_application() {
             println!("{} -> {}", name, path);
         }
     });
+    desktop_entry_map
 }
 
-fn init_gtk_window(win: & WebviewWindow) -> gtk::ApplicationWindow  {
-    let gtk_selection_window = win.gtk_window().unwrap();
+fn launch_application() {}
+
+fn init_gtk_window(
+    win: &WebviewWindow,
+    height_frac: f32,
+    width_frac: f32,
+    xanchor: Edge,
+    yanchor: Edge,
+) -> gtk::ApplicationWindow {
+    let gtk_selection_window =
+        gtk::ApplicationWindow::new(&win.gtk_window().unwrap().application().unwrap());
 
     gtk_selection_window.set_app_paintable(true);
 
@@ -341,19 +351,21 @@ fn init_gtk_window(win: & WebviewWindow) -> gtk::ApplicationWindow  {
         let height = geometry.height();
         println!("Geometry: {} {}", width, height);
 
-        gtk_selection_window.set_width_request(width / 5);
-        gtk_selection_window.set_height_request(height);
+        gtk_selection_window.set_width_request((width_frac * width as f32) as i32);
+        gtk_selection_window.set_height_request((height_frac * height as f32) as i32);
     }
-    gtk_selection_window.set_anchor(Edge::Right, true);
+    gtk_selection_window.set_anchor(xanchor, true);
+    gtk_selection_window.set_anchor(yanchor, true);
+    gtk_selection_window.set_exclusive_zone(0);
 
-    gtk_selection_window.set_layer(gtk_layer_shell::Layer::Bottom);
+    gtk_selection_window.set_layer(gtk_layer_shell::Layer::Top);
     gtk_selection_window.set_keyboard_interactivity(true);
 
     gtk_selection_window
 }
 
 #[command]
-fn open_selection_window(app: AppHandle) {
+fn open_selection_window(app: AppHandle) -> Result<(), ()> {
     if SELECTION_ID.with(|selection_cell| selection_cell.borrow().is_some()) {
         SELECTION_ID.with(|selection_cell| {
             if let Some(selection) = selection_cell.borrow().as_ref() {
@@ -369,17 +381,21 @@ fn open_selection_window(app: AppHandle) {
             &app.clone(),
             "selection_window",
             tauri::WebviewUrl::App("selection".into()),
-        ).build().expect("Unable to create selection window");
+        )
+        .build()
+        .expect("Unable to create selection window");
         selection_window.hide().unwrap();
 
-        let gtk_selection_window = init_gtk_window(& selection_window);
-
+        let gtk_selection_window =
+            init_gtk_window(&selection_window, 0.3, 0.2, Edge::Left, Edge::Bottom);
 
         SELECTION_ID.with(|sidebar_cell| {
             *sidebar_cell.borrow_mut() = Some(gtk_selection_window.clone());
         });
         gtk_selection_window.hide();
     }
+
+    Ok(())
 }
 
 fn main() {
@@ -404,23 +420,11 @@ fn main() {
 
             gtk_window.init_layer_shell();
 
-            let display = match gdk::Display::default() {
-                Some(display) => display,
-                None => {
-                    eprintln!("Failed to get default display");
-                    return Ok(());
-                }
-            };
+            let display = gdk::Display::default().expect("Failed to get default display");
             let monitors = display.n_monitors();
 
             for n in 0..monitors {
-                let mon = match display.monitor(n) {
-                    Some(mon) => mon,
-                    None => {
-                        eprintln!("Failed to get monitor {}", n);
-                        return Ok(());
-                    }
-                };
+                let mon = display.monitor(n).expect("Failed to get monitor");
                 let geometry = mon.geometry();
                 let width = geometry.width();
                 let height = geometry.height();
@@ -452,23 +456,11 @@ fn main() {
 
             gtk_window.init_layer_shell();
 
-            let display = match gdk::Display::default() {
-                Some(display) => display,
-                None => {
-                    eprintln!("Failed to get default display");
-                    return Ok(());
-                }
-            };
+            let display = gdk::Display::default().expect("Failed to get default display");
             let monitors = display.n_monitors();
 
             for n in 0..monitors {
-                let mon = match display.monitor(n) {
-                    Some(mon) => mon,
-                    None => {
-                        eprintln!("Failed to get monitor {}", n);
-                        return Ok(());
-                    }
-                };
+                let mon = display.monitor(n).expect("Failed to get monitor");
                 let geometry = mon.geometry();
                 let width = geometry.width();
                 let height = geometry.height();
