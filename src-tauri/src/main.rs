@@ -11,7 +11,7 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, fs};
-use tauri::command;
+use tauri::{command, AppHandle};
 use tauri::{Manager, Window};
 
 struct NodeProcess {
@@ -239,6 +239,7 @@ async fn open_sidebar(window: Window) {
 
 thread_local! {
     static SIDEBAR_ID: RefCell<Option<gtk::ApplicationWindow>> = const {RefCell::new(None) };
+    static SELECTION_ID: RefCell<Option<gtk::ApplicationWindow>> = const {RefCell::new(None) };
 }
 
 #[command]
@@ -315,6 +316,60 @@ fn launch_application() {
             println!("{} -> {}", name, path);
         }
     });
+}
+
+fn open_selection_window(app: AppHandle) {
+    let sidebar_window = tauri::WebviewWindow::builder(&app.clone(), "selection_window", tauri::WebviewUrl::App("selection".into()));
+    let sidebar = app.get_webview_window("opilot_sidebar").unwrap();
+    sidebar.hide().unwrap();
+
+    let gtk_window =
+        gtk::ApplicationWindow::new(&sidebar.gtk_window().unwrap().application().unwrap());
+
+    gtk_window.set_app_paintable(true);
+
+    let vbox = sidebar.default_vbox().unwrap();
+    sidebar.gtk_window().unwrap().remove(&vbox);
+    gtk_window.add(&vbox);
+
+    gtk_window.init_layer_shell();
+
+    let display = match gdk::Display::default() {
+        Some(display) => display,
+        None => {
+            eprintln!("Failed to get default display");
+            return ;
+        }
+    };
+    let monitors = display.n_monitors();
+
+    for n in 0..monitors {
+        let mon = match display.monitor(n) {
+            Some(mon) => mon,
+            None => {
+                eprintln!("Failed to get monitor {}", n);
+                return ;
+            }
+        };
+        let geometry = mon.geometry();
+        let width = geometry.width();
+        let height = geometry.height();
+        println!("Geometry: {} {}", width, height);
+
+        gtk_window.set_width_request(width / 5);
+        gtk_window.set_height_request(height);
+    }
+    gtk_window.set_anchor(Edge::Right, true);
+
+    gtk_window.set_layer(gtk_layer_shell::Layer::Bottom);
+    gtk_window.set_keyboard_interactivity(true);
+    gtk_window.show_all();
+    gtk_window.auto_exclusive_zone_enable();
+
+    SIDEBAR_ID.with(|sidebar_cell| {
+        *sidebar_cell.borrow_mut() = Some(gtk_window.clone());
+    });
+    gtk_window.hide();
 }
 
 fn main() {
